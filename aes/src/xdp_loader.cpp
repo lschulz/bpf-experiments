@@ -1,7 +1,7 @@
 /// \file
 /// \brief Userspace program for loading the AES-XDP program.
 extern "C" {
-#include "aes.h"
+#include "aes/aes.h"
 #include <net/if.h>
 #include <linux/if_link.h>
 }

@@ -1,8 +1,8 @@
 /// \file
 /// AES and AES-CMAC with hardware support
 
-#include "aes_hw_accel.h"
-#include "aes.h"
+#include "aes/aes_hw_accel.h"
+#include "aes/aes.h"
 
 #include <stdalign.h>
 #include <immintrin.h>

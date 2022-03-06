@@ -1,4 +1,4 @@
-#include "error.hpp"
+#include "libbpfpp/error.hpp"
 
 #include <string.h>
 

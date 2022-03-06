@@ -1,6 +1,6 @@
 extern "C" {
-#include "aes.h"
-#include "aes_hw_accel.h"
+#include "aes/aes.h"
+#include "aes/aes_hw_accel.h"
 }
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -12,7 +12,7 @@ extern "C" {
 
 TEST_CASE("128-bit key expansion")
 {
-    static const struct aes_key_schedule expected = { .w = {
+    static const struct aes_key_schedule expected = {{ .w = {
         0x16157e2b, 0xa6d2ae28, 0x8815f7ab, 0x3c4fcf09,
         0x17fefaa0, 0xb12c5488, 0x3939a323, 0x05766c2a,
         0xf295c2f2, 0x43b9967a, 0x7a803559, 0x7ff65973,
@@ -24,10 +24,10 @@ TEST_CASE("128-bit key expansion")
         0x2173d2ea, 0xd2ba8db5, 0x60f52b31, 0x2f298d7f,
         0xf36677ac, 0x21dcfa19, 0x4129d128, 0x6e005c57,
         0xa8f914d0, 0x8925eec9, 0xc80c3fe1, 0xa60c63b6,
-    }};
-    static const struct aes_key key = { .w = {
+    }}};
+    static const struct aes_key key = {{ .w = {
         0x16157e2b, 0xa6d2ae28, 0x8815f7ab, 0x3c4fcf09
-    }};
+    }}};
 
     SUBCASE("aes_key_expansion")
     {
@@ -58,40 +58,40 @@ TEST_CASE("128-bit AES single block")
 {
     constexpr size_t AES_TEST_VECTORS = 2;
     static const struct aes_block input[AES_TEST_VECTORS] = {
-        { .b = {
+        {{ .b = {
             0x32, 0x43, 0xf6, 0xa8,
             0x88, 0x5a, 0x30, 0x8d,
             0x31, 0x31, 0x98, 0xa2,
             0xe0, 0x37, 0x07, 0x34
-        }},
-        { . b = {
+        }}},
+        {{ .b = {
             0x00, 0x11, 0x22, 0x33,
             0x44, 0x55, 0x66, 0x77,
             0x88, 0x99, 0xaa, 0xbb,
             0xcc, 0xdd, 0xee, 0xff
-        }}
+        }}}
     };
     static const struct aes_block expected[AES_TEST_VECTORS] = {
-        { .b = {
+        {{ .b = {
             0x39, 0x25, 0x84, 0x1d,
             0x02, 0xdc, 0x09, 0xfb,
             0xdc, 0x11, 0x85, 0x97,
             0x19, 0x6a, 0x0b, 0x32
-        }},
-        { .b = {
+        }}},
+        {{ .b = {
             0x69, 0xc4, 0xe0, 0xd8,
             0x6a, 0x7b, 0x04, 0x30,
             0xd8, 0xcd, 0xb7, 0x80,
             0x70, 0xb4, 0xc5, 0x5a
-        }}
+        }}}
     };
     static const struct aes_key key[AES_TEST_VECTORS] = {
-        { .w = {
+        {{ .w = {
             0x16157e2b, 0xa6d2ae28, 0x8815f7ab, 0x3c4fcf09
-        }},
-        { .w = {
+        }}},
+        {{ .w = {
             0x03020100, 0x07060504, 0x0b0a0908, 0x0f0e0d0c
-        }}
+        }}}
     };
 
     SUBCASE("aes_cypher")
@@ -149,14 +149,14 @@ TEST_CASE("AES-CMAC")
     static const size_t msgLength[CMAC_TEST_VECTORS] = {
         0, 16, 40, 64
     };
-    static const struct aes_key key = { .w = {
+    static const struct aes_key key = {{ .w = {
         0x16157e2b, 0xa6d2ae28, 0x8815f7ab, 0x3c4fcf09
-    }};
+    }}};
     static const struct aes_cmac expected[CMAC_TEST_VECTORS] = {
-        { .w = { 0x29691dbb, 0x283759e9, 0x127da37f, 0x4667759b }},
-        { .w = { 0xb4160a07, 0x44414d6b, 0x9ddd9bf7, 0x7c284ad0 }},
-        { .w = { 0x4767a6df, 0x30e69ade, 0x6132ca30, 0x27c89714 }},
-        { .w = { 0xbfbef051, 0x929d3b7e, 0x177449fc, 0xfe3c3679 }}
+        {{ .w = { 0x29691dbb, 0x283759e9, 0x127da37f, 0x4667759b }}},
+        {{ .w = { 0xb4160a07, 0x44414d6b, 0x9ddd9bf7, 0x7c284ad0 }}},
+        {{ .w = { 0x4767a6df, 0x30e69ade, 0x6132ca30, 0x27c89714 }}},
+        {{ .w = { 0xbfbef051, 0x929d3b7e, 0x177449fc, 0xfe3c3679 }}}
     };
 
     SUBCASE("software")

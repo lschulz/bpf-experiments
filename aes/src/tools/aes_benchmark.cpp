@@ -1,6 +1,6 @@
 extern "C" {
-#include "aes.h"
-#include "aes_hw_accel.h"
+#include "aes/aes.h"
+#include "aes/aes_hw_accel.h"
 }
 
 #include <chrono>
@@ -8,9 +8,9 @@ extern "C" {
 #include <iostream>
 
 
-static const struct aes_key key = { .w = {
+static const struct aes_key key = {{ .w = {
     0x16157e2b, 0xa6d2ae28, 0x8815f7ab, 0x3c4fcf09
-}};
+}}};
 
 
 void benchmarkSoft(unsigned int n)

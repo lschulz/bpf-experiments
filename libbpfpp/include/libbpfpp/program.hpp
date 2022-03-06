@@ -125,14 +125,39 @@ public:
     void pinMaps(const char* path)
     {
         int err = bpf_object__pin_maps(obj, path);
-        if (err) throw BpfError(err, "Pinning maps failed");
+        if (err) throw BpfError(-err, "Pinning maps failed");
     }
 
     /// \brief Unpin all maps declared in the object.
     void unpinMaps(const char* path)
     {
         int err = bpf_object__unpin_maps(obj, path);
-        if (err) throw BpfError(err, "Unpinning maps failed");
+        if (err) throw BpfError(-err, "Unpinning maps failed");
+    }
+
+    /// \brief Reuse a map that was previously pinned.
+    /// \param[in] name Name of the map as defined in the object file.
+    /// \param[in] path Path of the pinned map.
+    /// \return True if the map is reused.
+    bool reusePinnedMap(const char* name, const char* path)
+    {
+        // Find the map
+        auto ptr = bpf_object__find_map_by_name(obj, name);
+        if (!ptr)
+        {
+            int err = libbpf_get_error(ptr);
+            if (err) throw BpfError(err, "Error in bpf_object__find_map_by_name");
+        }
+
+        // Open the pinned map
+        int fd = bpf_obj_get(path);
+        if (fd >= 0)
+        {
+            int err = bpf_map__reuse_fd(ptr, fd);
+            if (err) throw BpfError(-err, "Error in bpf_map__reuse_fd");
+            return true;
+        }
+        return false;
     }
 
     /// \brief Search for a program by ELF section name.
@@ -151,7 +176,7 @@ public:
     /// \brief Search for a map by name.
     /// \param[in] name Name of the map
     /// \param[in] type Expected map type (One of BPF_MAP_TYPE_*)
-    std::optional<Map> findMapByName(
+    std::optional<BpfLibMap> findMapByName(
         const char* name, std::uint32_t type) const
     {
         auto ptr = bpf_object__find_map_by_name(obj, name);
@@ -159,7 +184,7 @@ public:
         {
             int err = libbpf_get_error(ptr);
             if (err) throw BpfError(err, "Error in bpf_object__find_map_by_name");
-            return Map(ptr, type);
+            return BpfLibMap(ptr, type);
         }
         return std::nullopt;
     }

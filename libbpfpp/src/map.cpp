@@ -1,17 +1,15 @@
-#include "map.hpp"
-
-extern "C" {
-#include <unistd.h>
-}
+#include "libbpfpp/map.hpp"
 
 
 namespace Bpf {
 
-Map::Map(struct bpf_map* map, std::uint32_t type)
-    : map(map), fd(bpf_map__fd(map)), mapType(type)
-{
-    if (fd < 0) throw BpfError(-fd, "Cannot get map file descriptor");
+/////////
+// Map //
+/////////
 
+Map::Map(int fd, std::uint32_t type)
+    : mapType(type)
+{
     struct bpf_map_info info;
     unsigned int infoLen = sizeof(info);
     int err = bpf_obj_get_info_by_fd(fd, &info, &infoLen);
@@ -29,7 +27,7 @@ bool Map::lookup(
 {
     if (!verifyArgSize(keySize, valueSize))
         throw std::out_of_range("Invalid key/value size.");
-    int err = bpf_map_lookup_elem(fd, key, value);
+    int err = bpf_map_lookup_elem(getFd(), key, value);
     if (err)
     {
         if (errno == ENOENT)
@@ -46,7 +44,7 @@ bool Map::lookupAndErase(
 {
     if (!verifyArgSize(keySize, valueSize))
         throw std::out_of_range("Invalid key/value size.");
-    int err = bpf_map_lookup_and_delete_elem(fd, key, value);
+    int err = bpf_map_lookup_and_delete_elem(getFd(), key, value);
     if (err)
     {
         if (errno == ENOENT)
@@ -64,7 +62,7 @@ bool Map::update(
 {
     if (!verifyArgSize(keySize, valueSize))
         throw std::out_of_range("Invalid key/value size.");
-    int err = bpf_map_update_elem(fd, key, value, flags);
+    int err = bpf_map_update_elem(getFd(), key, value, flags);
     if (err)
     {
         switch (errno)
@@ -86,7 +84,7 @@ bool Map::erase(const void *key, std::uint32_t keySize)
 {
     if (keySize < this->keySize)
         throw std::out_of_range("Invalid key size.");
-    int err = bpf_map_delete_elem(fd, key);
+    int err = bpf_map_delete_elem(getFd(), key);
     if (err)
     {
         if (errno == ENOENT)
@@ -107,6 +105,32 @@ bool Map::verifyArgSize(std::uint32_t key, std::uint32_t value) const
     default:
         return key >= keySize && value >= valueSize;
     }
+}
+
+///////////////
+// BpfLibMap //
+///////////////
+
+static int getMapFd(struct bpf_map* map)
+{
+    int fd = bpf_map__fd(map);
+    if (fd < 0) throw BpfError(-fd, "Cannot get map file descriptor");
+    return fd;
+}
+
+BpfLibMap::BpfLibMap(struct bpf_map* map, std::uint32_t type)
+    : Map(getMapFd(map), type), map(map)
+{}
+
+///////////////
+// PinnedMap //
+///////////////
+
+PinnedMap PinnedMap::Open(const char* path, std::uint32_t type)
+{
+    FileDesc fd(bpf_obj_get(path));
+    if (!fd) throw BpfError(-fd, std::string("Cannot open map pinned at ") + path);
+    return PinnedMap(std::move(fd), type);
 }
 
 } // namespace Bpf

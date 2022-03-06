@@ -1,4 +1,4 @@
-#include "util.hpp"
+#include "libbpfpp/util.hpp"
 
 extern "C" {
 #include <poll.h>
@@ -42,7 +42,7 @@ void InterruptSignalHandler::launchHandler()
 
 void InterruptSignalHandler::joinHandler()
 {
-    kill(handlerThread.native_handle(), SIGTERM);
+    kill(0, SIGTERM);
     handlerThread.join();
 }
 
@@ -59,14 +59,17 @@ bool InterruptSignalHandler::wait(std::chrono::high_resolution_clock::duration t
 // tracePrint //
 ////////////////
 
-void tracePrint(const InterruptSignalHandler &cond)
+bool tracePrint(const InterruptSignalHandler &cond)
 {
     static const char* TRACEFS_PIPE = "/sys/kernel/debug/tracing/trace_pipe";
     char *line = NULL;
     std::size_t lineLen = 0;
 
     FILE* stream = fopen(TRACEFS_PIPE, "r");
-    if (!stream) return;
+    if (!stream) {
+        std::cerr << "Cannot open kernel trace file" << std::endl;
+        return false;
+    }
 
     struct pollfd fds = {
         .fd = fileno(stream),
@@ -79,7 +82,10 @@ void tracePrint(const InterruptSignalHandler &cond)
             while (poll(&fds, 1, 0))
             {
                 std::size_t readChars = getline(&line, &lineLen, stream);
-                if (readChars < 0) return;
+                if (readChars < 0) {
+                    std::cerr << "Error reading kernel trace file" << std::endl;
+                    return false;
+                }
                 std::cout << line;
             }
         }
@@ -92,6 +98,7 @@ void tracePrint(const InterruptSignalHandler &cond)
 
     free(line);
     fclose(stream);
+    return true;
 }
 
 } // namespace Util

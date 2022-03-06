@@ -10,7 +10,7 @@
 /// RFC 4493 (AES-CMAC): https://datatracker.ietf.org/doc/html/rfc4493
 /// AES Implementation in C: https://github.com/kokke/tiny-AES-c
 
-#include "aes.h"
+#include "aes/aes.h"
 
 #ifdef __bpf__
     #include "bpf/types.h"
@@ -379,16 +379,19 @@ void aes_cmac_no_loops(
             state.b[i] ^= data[offset + i];
         aes_cypher(&state, key_schedule, &state);
         offset += 4*AES_BLOCK_SIZE;
+        __attribute__((fallthrough));
     case 3:
         for (size_t i = 0; i < 4*AES_BLOCK_SIZE; ++i)
             state.b[i] ^= data[offset + i];
         aes_cypher(&state, key_schedule, &state);
         offset += 4*AES_BLOCK_SIZE;
+        __attribute__((fallthrough));
     case 2:
         for (size_t i = 0; i < 4*AES_BLOCK_SIZE; ++i)
             state.b[i] ^= data[offset + i];
         aes_cypher(&state, key_schedule, &state);
         offset += 4*AES_BLOCK_SIZE;
+        __attribute__((fallthrough));
     case 1:
     {
         size_t i = 0;

@@ -1,5 +1,6 @@
 #pragma once
 #include "error.hpp"
+#include "fd.hpp"
 
 extern "C" {
 #include <bpf.h>
@@ -7,6 +8,7 @@ extern "C" {
 }
 
 #include <cstdint>
+#include <utility>
 
 
 namespace Bpf {
@@ -14,8 +16,12 @@ namespace Bpf {
 class Map
 {
 public:
+    Map(int fd, std::uint32_t type);
+
+    virtual ~Map() = default;
+
     /// \brief Returns the map's file descriptor.
-    int getFd() const { return fd; }
+    virtual int getFd() const = 0;
 
     /// \brief Search for en element in the map and return its value in \p value .
     /// \param[in] key
@@ -55,32 +61,58 @@ public:
     /// \return True if the element was removed, false if the key was not found.
     bool erase(const void *key, std::uint32_t keySize);
 
+private:
+    bool verifyArgSize(std::uint32_t key, std::uint32_t value) const;
+
+private:
+    std::uint32_t mapType, keySize, valueSize;
+};
+
+class BpfLibMap : public Map
+{
+public:
+    BpfLibMap(struct bpf_map* map, std::uint32_t type);
+
+    int getFd() const override
+    { return bpf_map__fd(map); }
+
     const char* getPinPath() const { return bpf_map__get_pin_path(map); }
     void setPinPath(const char* path) { bpf_map__set_pin_path(map, path); }
 
     void pin(const char* path)
     {
         int err = bpf_map__pin(map, path);
-        if (err) throw BpfError(err, "Pinning map failed");
+        if (err) throw BpfError(-err, "Pinning map failed");
     }
 
     void unpin(const char* path)
     {
         int err = bpf_map__unpin(map, path);
-        if (err) throw BpfError(err, "Unpinning map failed");
+        if (err) throw BpfError(-err, "Unpinning map failed");
     }
 
 private:
-    Map(struct bpf_map* map, std::uint32_t type);
-
-    bool verifyArgSize(std::uint32_t key, std::uint32_t value) const;
-
+    BpfLibMap(struct bpf_map* map, int fd, std::uint32_t type);
     friend class Object;
 
 private:
     struct bpf_map *map = nullptr;
-    int fd;
-    std::uint32_t mapType, keySize, valueSize;
+};
+
+class PinnedMap : public Map
+{
+public:
+    static PinnedMap Open(const char* path, std::uint32_t type);
+
+    int getFd() const override { return fd.get(); }
+
+private:
+    PinnedMap(FileDesc fd, std::uint32_t type)
+        : Map(fd.get(), type), fd(std::move(fd))
+    {}
+
+private:
+    FileDesc fd;
 };
 
 } // namespac Bpf

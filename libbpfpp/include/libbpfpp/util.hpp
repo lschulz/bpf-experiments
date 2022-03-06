@@ -45,7 +45,8 @@ private:
 
 /// \brief Print lines from `/sys/kernel/debug/tracing/trace_pipe` until \p cond indicates the
 /// program should terminate.
-void tracePrint(const InterruptSignalHandler &cond);
+/// \return False on error, true on normal termination.
+bool tracePrint(const InterruptSignalHandler &cond);
 
 } // namespace Util
 } // namespace Bpf

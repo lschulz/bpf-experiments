@@ -1,0 +1,51 @@
+{
+  "external": {
+    "1": {
+      "ifname": "veth1",
+      "local": {
+        "mac": "7e:e7:86:a8:68:73",
+        "ip": "10.1.0.2",
+        "port": 30042
+      },
+      "remote" : {
+        "mac": "3e:fc:20:e7:9c:a1",
+        "ip": "10.1.0.1",
+        "port": 30043
+      }
+    },
+    "2": {
+      "ifname": "veth3",
+      "local": {
+        "mac": "96:c7:2b:42:25:3f",
+        "ip": "10.1.1.2",
+        "port": 30044
+      },
+      "remote" : {
+        "mac": "e6:33:98:64:a0:ae",
+        "ip": "10.1.1.1",
+        "port": 30045
+      }
+    }
+  },
+  "remote": {
+    "3": {
+      "ip": "10.2.0.2",
+      "port": 30042
+    },
+    "4": {
+      "ip": "10.3.0.2",
+      "port": 30042
+    }
+  },
+  "internal": [
+    {
+      "ifname": "veth5",
+      "ip": "10.2.0.1",
+      "port": 30042
+    }
+  ],
+  "keys" : {
+    "0": "ZmZmZmZmZmZmZmZmZmZmZg=="
+  },
+  "switch_id": 1
+}

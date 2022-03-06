@@ -11,7 +11,7 @@
 #define htonl(x) __builtin_bswap32(x)
 #define htonll(x) __builtin_bswap64(x)
 
-#define memset(dest, ch, count) __builtin__memset((dest), (ch), (count))
+#define memset(dest, ch, count) __builtin_memset((dest), (ch), (count))
 #define memcpy(dest, src, count) __builtin_memcpy((dest), (src), (count))
 
 #endif // BUILTIN_H_GUARD
