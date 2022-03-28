@@ -285,5 +285,5 @@ shift
 case "$COMMAND" in
     build|run|stop|attach_xdp|detach_xdp|logs|enter|clean)
         "cmd_$COMMAND" "$@" ;;
-    *) echo "Command no recognized."; exit 1 ;;
+    *) echo "Command no recognized"; exit 1 ;;
 esac

@@ -1,2 +1,6 @@
 *.o
+*.log
+*.pcap
+.vscode
+__pycache__
 /build

@@ -14,6 +14,7 @@ Map::Map(int fd, std::uint32_t type)
     unsigned int infoLen = sizeof(info);
     int err = bpf_obj_get_info_by_fd(fd, &info, &infoLen);
     if (err) throw BpfError(err, "Error in bpf_obj_get_info_by_fd");
+    if (infoLen != sizeof(info)) throw std::invalid_argument("Not a map");
 
     if (info.type != mapType)
         throw BpfError(0, "Map type mismatch");
