@@ -33,10 +33,15 @@ static void printUsage()
         "Usage: br-loader attach <xdp object> <config> [iface...]\n"
         "                 detach [iface...]\n"
         "                 watch <br> <iface>\n"
+    #ifdef ENABLE_HF_CHECK
         "       br-loader key add <br> <index> <key>\n"
-        "                 key remove <br> <index>\n";
+        "                 key remove <br> <index>\n"
+    #endif
+    ;
 }
 
+#ifdef ENABLE_HF_CHECK
+/// \brief Decode a base64-encoded AES-128 key.
 static void decodeKey(const std::string &base64, struct aes_key &key)
 {
     using namespace boost::archive::iterators;
@@ -46,6 +51,7 @@ static void decodeKey(const std::string &base64, struct aes_key &key)
     auto i = Iter(std::begin(base64)), end = Iter(std::end(base64) - 2);
     for (size_t j = 0; i != end && j < sizeof(key); ++i, ++j) key.b[j] = *i;
 }
+#endif // ENABLE_HF_CHECK
 
 /// \brief Convert interface names given on the command line to interface IDs.
 static std::vector<unsigned int> parseInterfaces(int argc, char* argv[])
@@ -75,7 +81,9 @@ int attachBr(int argc, char* argv[])
     std::cout << *config;
 
     auto pinDir = std::filesystem::path(PIN_BASE_DIR) / config->self;
+#ifdef ENABLE_HF_CHECK
     auto macKeyMapPath = pinDir / "mac_key_map";
+#endif
     auto portStatsMapPath = pinDir / "port_stats_map";
 
     // Load XDP program
@@ -87,21 +95,27 @@ int attachBr(int argc, char* argv[])
         return -1;
     }
     xdp->setType(BPF_PROG_TYPE_XDP);
+
+#ifdef ENABLE_HF_CHECK
     bool reuseKeyMap = bpf.reusePinnedMap("mac_key_map", macKeyMapPath.c_str());
-    bool reuseStatsMap = bpf.reusePinnedMap("port_stats_map", portStatsMapPath.c_str());
     if (reuseKeyMap)
         std::cout << "Reusing pinned map: " << macKeyMapPath << "\n";
+#endif
+    bool reuseStatsMap = bpf.reusePinnedMap("port_stats_map", portStatsMapPath.c_str());
     if (reuseStatsMap)
         std::cout << "Reusing pinned map: " << portStatsMapPath << "\n";
+
     bpf.load();
     initializeMaps(bpf, *config, interfaces);
 
     // Pin maps that we need to read or update later
+#ifdef ENABLE_HF_CHECK
     if (!reuseKeyMap)
     {
         auto map = bpf.findMapByName("mac_key_map", BPF_MAP_TYPE_HASH);
         if (map) map->pin(macKeyMapPath.c_str());
     }
+#endif
     if (!reuseStatsMap)
     {
         auto map = bpf.findMapByName("port_stats_map", BPF_MAP_TYPE_PERCPU_HASH);
@@ -144,6 +158,7 @@ int watchBr(int argc, char* argv[])
     return EXIT_SUCCESS;
 }
 
+#ifdef ENABLE_HF_CHECK
 int addHopKey(int argc, char* argv[])
 {
     if (argc < 3)
@@ -224,6 +239,7 @@ int removeHopKey(int argc, char* argv[])
 
     return EXIT_SUCCESS;
 }
+#endif // ENABLE_HF_CHECK
 
 int main(int argc, char* argv[])
 {
@@ -236,6 +252,7 @@ int main(int argc, char* argv[])
                 return detachBr(argc - 2, argv + 2);
             else if (std::strcmp(argv[1], "watch") == 0)
                 return watchBr(argc - 2, argv + 2);
+        #ifdef ENABLE_HF_CHECK
             else if (std::strcmp(argv[1], "key") == 0)
             {
                 if (argc >= 3)
@@ -246,6 +263,7 @@ int main(int argc, char* argv[])
                         return removeHopKey(argc - 3, argv + 3);
                 }
             }
+        #endif
         }
         catch (std::exception &e) {
             std::cerr << "ERROR: " << e.what() << '\n';

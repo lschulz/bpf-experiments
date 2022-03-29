@@ -7,13 +7,12 @@
 
 #include <linux/bpf.h>
 
-// #define ENABLE_VLAN // not implemented
+#ifdef __INTELLISENSE__
 #define ENABLE_IPV4
-// #define ENABLE_IPV6 // not implemented
 #define ENABLE_SCION_PATH
-#define ENABLE_INT_OVER_INNER_UDP
+#define ENABLE_HF_CHECK
+#endif
 
-#define INTERNAL_IFACE 0
 
 #define MAKE_VERDICT(action, reason) ((action & 0x07) | (reason << 3))
 
@@ -51,10 +50,10 @@ struct ingress_addr
 {
     // Only one of ipv4 and ipv6 is allowed to be non-zero.
 #ifdef ENABLE_IPV4
-    u32 ipv4;      // in network byte order
+    u32 ipv4;    // in network byte order
 #endif
 #ifdef ENABLE_IPV6
-    u32 ipv6[4];
+    u32 ipv6[4]; // in network byte order
 #endif
     u16 port;    // in network byte order
     u16 ifindex; // in host byte order
@@ -87,12 +86,12 @@ struct redirect_params
 struct interface
 {
 #ifdef ENABLE_IPV4
-    u32 ipv4;   // in network byte order
+    u32 ipv4;    // in network byte order
 #endif
 #ifdef ENABLE_IPV6
-    u32 ipv6[4];
+    u32 ipv6[4]; // in network byte order
 #endif
-    u16 port; // in network byte order
+    u16 port;    // in network byte order
 };
 
 struct fwd_info
@@ -115,8 +114,9 @@ struct scratchpad
     u32 verdict;
 
     // Constants set by the control plane
+    // TODO
 
-    // Copies of all fields we might need to update
+    // Metadata and copies of updatable fields
     struct
     {
         u8 dst[6];
@@ -124,6 +124,7 @@ struct scratchpad
         u8 src[6];
         u16 _padding2;
     } eth;
+
     struct ip_struct {
         u32 family; // AF_INET or AF_INET6
 #ifdef ENABLE_IPV4
@@ -143,11 +144,14 @@ struct scratchpad
         } v6;
 #endif
     } ip;
+
     struct {
         u16 dst;
         u16 src;
     } udp;
+
     u32 path_type;
+
     union {
         struct {
             u32 h_meta; // path meta field in host byte order
@@ -163,16 +167,18 @@ struct scratchpad
     u64 ip_residual;
     u64 udp_residual;
 
-    // Input/Output for FIB lookup
+    // Input/output for FIB lookup
     struct bpf_fib_lookup fib_lookup;
 
     // Interface the packet will be redirected to
     int egress_ifindex;
 
+#ifdef ENABLE_HF_CHECK
     // Input for mac verification
     u32 verify_mac_mask;
     struct macinput macinput[2];
     u64 mac[2];
+#endif
 };
 
 #endif // COMMON_H_GUARD

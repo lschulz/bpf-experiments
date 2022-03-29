@@ -99,7 +99,7 @@ void watchStats(const Bpf::PinnedMap &map, uint32_t ifindex)
     auto t0 = std::chrono::high_resolution_clock::now();
     if (!getStats(map, ifindex, stats))
     {
-        std::cout << "Lookup failed\n";
+        std::cerr << "Lookup failed\n";
         return;
     }
     printStats(stats, rates);
@@ -113,7 +113,7 @@ void watchStats(const Bpf::PinnedMap &map, uint32_t ifindex)
         prevStats = stats;
         if (!getStats(map, ifindex, stats))
         {
-            std::cout << "Lookup failed\n";
+            std::cerr << "Lookup failed\n";
             break;
         }
         calcRates(stats, prevStats, deltaT, rates);

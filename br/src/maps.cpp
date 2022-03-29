@@ -58,12 +58,14 @@ void storeIPv6(const boost::asio::ip::address_v6 &ip, uint8_t *__restrict__ dst)
     "Border router configuration contains IPv6 address, but IPv6 support is deactivated.");
 #endif
 
+#ifdef ENABLE_HF_CHECK
 void populateSBox(Bpf::Map &sboxMap)
 {
     uint32_t key = 0;
     const uint8_t *value = AES_SBox;
     sboxMap.update(&key, sizeof(key), value, 256, BPF_ANY);
 }
+#endif
 
 void populateIngressMap(Bpf::Map &ingressMap, const BrConfig &config)
 {
@@ -181,7 +183,7 @@ void initScratchpad(Bpf::Map &scratchpad, const BrConfig &config)
 
 void printWarning(const char *mapName)
 {
-    std::cerr << "WARNING: Map" << mapName << "not found or of incompatible type.\n";
+    std::cerr << "WARNING: Map " << mapName << " not found or of incompatible type.\n";
 }
 
 } // namespace
@@ -199,10 +201,12 @@ void initializeMaps(
     const char *mapName = nullptr;
     std::optional<Bpf::BpfLibMap> map;
 
+#ifdef ENABLE_HF_CHECK
     mapName = "AES_SBox";
     map = bpf.findMapByName(mapName, BPF_MAP_TYPE_ARRAY);
     if (map) populateSBox(*map);
     else printWarning(mapName);
+#endif
 
     mapName = "ingress_map";
     map = bpf.findMapByName(mapName, BPF_MAP_TYPE_HASH);

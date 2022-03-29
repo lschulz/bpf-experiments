@@ -26,6 +26,7 @@ using std::uint64_t;
 
 namespace {
 
+/// \brief Load JSON from an input stream.
 boost::json::value parseJson(std::istream &stream)
 {
     boost::json::stream_parser parser;
@@ -67,25 +68,11 @@ UdpEp parseUdpEp(const boost::json::string &str)
     };
 }
 
-#if 0
-uint64_t parseMac(const std::string &mac)
-{
-    uint64_t result = 0;
-    std::stringstream stream;
-    stream << mac;
-    for (int i = 0; i < 6; ++i)
-    {
-        unsigned int byte = 0;
-        stream >> std::hex >> byte;
-        if (!stream || byte > 255) throw std::invalid_argument("Invalid MAC");
-        result |= (static_cast<uint64_t>(byte) << (8*i));
-        if (i < 5 && stream.get() != ':') throw std::invalid_argument("Invalid MAC");
-    }
-    return result;
-}
-#endif
-
-/// \brief Parse a SCION topology declaration (topology.json).
+/// \brief Parse a SCION topology declaration ("topology.json").
+/// \param[in] topo Topology JSON
+/// \param[in] self Id of the border router itself as it appears in the topology file
+///            (e.g. "br1-ff00_0_1-1")
+/// \param[out] Interfaces discovered from the topology file are added to this struct.
 /// \exception Throws std::invalid_argument or std::out_of_range if parsing errors occur.
 void parseTopology(const boost::json::value &topo, const std::string &self, BrInterfaces &brIf)
 {
@@ -119,6 +106,10 @@ void parseTopology(const boost::json::value &topo, const std::string &self, BrIn
     }
 }
 
+/// \brief Read the internal interface table from the main configuration file.
+/// \param[in] confTable The configuration file/table.
+/// \param[out] intIfs Internal interfaces are added to this vector.
+/// \exception Throws std::invalid_argument or std::out_of_range if parsing errors occur.
 void parseInternalIfaces(const toml::table &confTable, std::vector<InternalIface> &intIfs)
 {
     using boost::asio::ip::make_address;
@@ -144,6 +135,9 @@ void parseInternalIfaces(const toml::table &confTable, std::vector<InternalIface
 }
 
 using IfMap = std::unordered_map<boost::asio::ip::address, std::string>;
+
+/// \brief Returns a mapping from IP address to interface name for all Ethernet interfaces in the
+/// system (or network namespace).
 IfMap getIfAddr()
 {
     using boost::asio::ip::address;

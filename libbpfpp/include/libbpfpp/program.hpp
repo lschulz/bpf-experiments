@@ -91,7 +91,7 @@ public:
     static Object FromFile(const std::filesystem::path &objFile)
     {
         auto obj = bpf_object__open(objFile.c_str());
-        int err = libbpf_get_error(obj);
+        int err = -libbpf_get_error(obj);
         if (err) throw BpfError(err, "Error reading " + objFile.string());
         return Object(obj);
     }
@@ -145,7 +145,8 @@ public:
         auto ptr = bpf_object__find_map_by_name(obj, name);
         if (!ptr)
         {
-            int err = libbpf_get_error(ptr);
+            int err = -libbpf_get_error(ptr);
+            if (err == ENOENT) return false;
             if (err) throw BpfError(err, "Error in bpf_object__find_map_by_name");
         }
 
@@ -166,7 +167,7 @@ public:
         auto ptr = bpf_object__find_program_by_title(obj, section);
         if (ptr)
         {
-            int err = libbpf_get_error(ptr);
+            int err = -libbpf_get_error(ptr);
             if (err) throw BpfError(err, "Error in bpf_object__find_program_by_title");
             return Program(ptr);
         }
@@ -182,8 +183,9 @@ public:
         auto ptr = bpf_object__find_map_by_name(obj, name);
         if (ptr)
         {
-            int err = libbpf_get_error(ptr);
-            if (err) throw BpfError(err, "Error in bpf_object__find_map_by_name");
+            int err = -libbpf_get_error(ptr);
+            if (err == ENOENT) return std::nullopt;
+            else if (err) throw BpfError(err, "Error in bpf_object__find_map_by_name");
             return BpfLibMap(ptr, type);
         }
         return std::nullopt;

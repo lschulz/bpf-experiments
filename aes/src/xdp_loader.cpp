@@ -18,9 +18,9 @@ struct key_schedule {
     struct aes_block subkeys[2];
 };
 
-static const auto STATIC_AES_KEY = aes_key { .w = {
+static const auto STATIC_AES_KEY = aes_key {{ .w = {
     0x16157e2b, 0xa6d2ae28, 0x8815f7ab, 0x3c4fcf09
-}};
+}}};
 
 Bpf::Util::InterruptSignalHandler signalHandler;
 
