@@ -1,68 +1,39 @@
 BPF Experiments
 ===============
 
-- [AES-CMAC](/aes)
-- [XDP-BR](/br)
-- [SCION-INT](/int)
-- [Local SCION topology for testing](/scion)
+This repository contains a BPF XDP application intended to accelerate the reference
+[SCION](https://github.com/scionproto/scion) border router by forwarding some common packet types
+directly in XDP.
 
+### Overview
+- [/aes](/aes) Implementation of AES-CMAC for use in XDP as required by SCION.
+- [/br](/br) The SCION XDP border router.
+  - [/br/evaluation](/br/evaluation) contains some preliminary evaluation results.
+- [/libbpfpp](/libbpfpp) C++ wrappers for libbpf
+- [/libbpfpy](/libbpfpy) Python helpers for interfacing with libbpf
+- [/scion](/scion) Some scripts for testing the XDP router in a dockerized local SCION topology.
+
+Building
+--------
 Clone with `--recurse-submodules` or initialize the submodules after cloning:
 ```bash
 git submodule update --init
 ```
 
-Dependencies (Ubuntu 21.04)
----------------------------
+First build libbpf:
 ```bash
-sudo apt install build-essential linux-tools-common linux-tools-generic clang \
-    libelf-dev doctest-dev libc6-dev-i386
-# For some of the tests:
-sudo pip3 install scapy pyroute2
-```
-
-Build libbpf:
-```bash
-cd libbpf/src
+pushd libbpf/src
 make
-```
-
-Run local SCION topology with XDP-BR
-------------------------------------
-Clone and build SCION (by default in ~/scion):
-```bash
-git clone https://github.com/netsec-ethz/scion.git
-pushd scion
-./scion.sh bazel_remote
-./scion.sh build
 popd
 ```
 
-Build the XDP border router and run a local SCION network:
+Build the repository by invoking cmake directly
 ```bash
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
 make
-cd scion
-./scion run
-./scion attach_xdp
 ```
+or run simply run `make`.
 
-Stop the network:
-```bash
-./scion stop
-./scion clean
-```
-
-Dump jited instructions on Ubuntu
----------------------------------
-Ubuntu's bpftool is compiled without libbfd and cannot dump the jited BPF instructions. To compile
-bpftool with libbfd available, install the the kernel source and libbfd:
-```bash
-sudo apt install linux-source-5.13.0 # Check kernel version with uname -r
-sudo apt install llvm binutils-dev
-```
-Unpack the kernel source from `/usr/src/linux-source-5.13.0/linux-source-5.13.0.tar.bz2` to
-somewhere convenient and run make in `tools/bpf/bpftool`.
-
-Dump the jited program with
-```bash
-sudo ./bpftool prog dump jited <prog>
-```
+See the various subdirectories for instructions on how to run tests etc.
