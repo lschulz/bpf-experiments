@@ -26,7 +26,7 @@ function print_help() {
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 PROJECT_DIR=$(readlink -f "$SCRIPT_DIR/../..")
 
-NETNS="$SCRIPT_DIR/netns.bash"
+NETNS="$PROJECT_DIR/utils/netns.bash"
 PTF="$PROJECT_DIR/ptf/ptf"
 BR_LOADER="$PROJECT_DIR/build/br/br-loader"
 XDP_OBJECT="$PROJECT_DIR/build/br/xdp_br.o"

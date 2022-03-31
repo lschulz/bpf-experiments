@@ -1,10 +1,12 @@
 #!/bin/bash
 
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+PROJECT_DIR=$(readlink -f "$SCRIPT_DIR/../../..")
+NETNS="$PROJECT_DIR/utils/netns.bash"
 
 # Add network namespace
-sudo "$SCRIPT_DIR/../netns.bash" prepare
-sudo "$SCRIPT_DIR/../netns.bash" add sw0
+sudo "$NETNS" prepare
+sudo "$NETNS" add sw0
 
 # Create veth pairs
 sudo ip link add veth0 type veth peer name veth1 netns sw0
