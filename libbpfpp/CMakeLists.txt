@@ -14,6 +14,7 @@ add_library(bpfpp OBJECT
     src/util.cpp
 )
 target_compile_features(bpfpp PUBLIC cxx_std_17)
+target_compile_options(bpfpp PUBLIC -Wno-deprecated-declarations) # FIXME
 target_include_directories(bpfpp PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(bpfpp PUBLIC libbpf)
 target_link_libraries(bpfpp PUBLIC elf)

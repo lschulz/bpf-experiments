@@ -83,7 +83,7 @@ struct ingress_addr
     u16 ifindex; // in host byte order
 };
 
-/// \brief Expanded AES key and AES-CMAC subkey for hop field validation.
+/// \brief Expanded AES key and AES-CMAC subkey for hop field verification.
 struct hop_key
 {
     struct aes_key_schedule key;

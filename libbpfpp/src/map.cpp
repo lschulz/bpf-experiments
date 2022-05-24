@@ -95,7 +95,7 @@ bool Map::update(
         case E2BIG:
             return false; // map is full
         default:
-            throw BpfError(0, "Error in bpf_map_update_elem");
+            throw BpfError(errno, "Error in bpf_map_update_elem");
         }
     }
     return true;
@@ -111,7 +111,7 @@ bool Map::erase(const void *key, std::uint32_t keySize)
         if (errno == ENOENT)
             return false; // element not found
         else
-            throw BpfError(err, "Error in bpf_map_delete_elem");
+            throw BpfError(errno, "Error in bpf_map_delete_elem");
     }
     return true;
 }

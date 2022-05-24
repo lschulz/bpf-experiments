@@ -131,7 +131,8 @@ public:
 
     ~Object()
     {
-        if (obj) bpf_object__close(obj);
+        // FIXME: double free
+        // if (obj) bpf_object__close(obj);
     }
 
     /// \brief Load all programs contained in the object into the kernel.
@@ -189,6 +190,19 @@ public:
         {
             int err = -libbpf_get_error(ptr);
             if (err) throw BpfError(err, "Error in bpf_object__find_program_by_title");
+            return Program(ptr);
+        }
+        return std::nullopt;
+    }
+
+    /// \brief Search for a program by function name.
+    std::optional<Program> findProgramByName(const char* name) const
+    {
+        auto ptr = bpf_object__find_program_by_name(obj, name);
+        if (ptr)
+        {
+            int err = -libbpf_get_error(ptr);
+            if (err) throw BpfError(err, "Error in bpf_object__find_program_by_name");
             return Program(ptr);
         }
         return std::nullopt;
