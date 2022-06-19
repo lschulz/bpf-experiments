@@ -108,7 +108,7 @@ int attachBr(int argc, char* argv[])
 
     // Load XDP program
     auto bpf = Bpf::Object::FromFile(argv[0]);
-    auto xdp = bpf.findProgramBySection("xdp");
+    auto xdp = bpf.findProgramByName("border_router");
     if (!xdp)
     {
         std::cerr << "XDP program not found\n" << std::endl;

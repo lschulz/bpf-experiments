@@ -45,9 +45,9 @@ static const auto STATIC_AES_KEY = aes_key {{ .w = {
 Bpf::Util::InterruptSignalHandler signalHandler;
 
 
-std::optional<Bpf::Program> loadProgram(Bpf::Object &bpf, const char *section)
+std::optional<Bpf::Program> loadProgram(Bpf::Object &bpf, const char *name)
 {
-    auto prog = bpf.findProgramBySection(section);
+    auto prog = bpf.findProgramByName(name);
     if (!prog)
     {
         std::cerr << "Program not found" << std::endl;
@@ -109,7 +109,7 @@ int run(const char *objPath, int ifindex)
     try {
         const int xdpFlags = XDP_FLAGS_DRV_MODE;
         auto bpf = Bpf::Object::FromFile(objPath);
-        auto prog = loadProgram(bpf, ".xdp");
+        auto prog = loadProgram(bpf, "xdp_aes");
         if (!prog) return -1;
         if (!populateMaps(bpf)) return -1;
 

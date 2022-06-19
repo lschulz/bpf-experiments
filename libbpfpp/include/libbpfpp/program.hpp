@@ -64,7 +64,9 @@ public:
     /// \param[in] flags A combination of XDP_FLAGS_*
     void attachXDP(int ifindex, std::uint32_t flags)
     {
-        int err = bpf_set_link_xdp_fd(ifindex, bpf_program__fd(prog), flags);
+        bpf_xdp_attach_opts opts = {};
+        opts.sz = sizeof(bpf_xdp_attach_opts);
+        int err = bpf_xdp_attach(ifindex, bpf_program__fd(prog), flags, &opts);
         switch (-err)
         {
         case 0:
@@ -84,7 +86,9 @@ public:
     /// \param[in] flags A combination of XDP_FLAGS_*
     static void detachXDP(int ifindex, std::uint32_t flags)
     {
-        int err = bpf_set_link_xdp_fd(ifindex, -1, flags);
+        bpf_xdp_attach_opts opts = {};
+        opts.sz = sizeof(bpf_xdp_attach_opts);
+        int err = bpf_xdp_attach(ifindex, -1, flags, &opts);
         if (err) throw XdpAttachError(-err, ifindex, "Detaching XDP program failed");
     }
 
@@ -181,14 +185,14 @@ public:
         return false;
     }
 
-    /// \brief Search for a program by ELF section name.
-    std::optional<Program> findProgramBySection(const char* section) const
+    /// \brief Search for a program by function name.
+    std::optional<Program> findProgramByName(const char* name) const
     {
-        auto ptr = bpf_object__find_program_by_title(obj, section);
+        auto ptr = bpf_object__find_program_by_name(obj, name);
         if (ptr)
         {
             int err = -libbpf_get_error(ptr);
-            if (err) throw BpfError(err, "Error in bpf_object__find_program_by_title");
+            if (err) throw BpfError(err, "Error in bpf_object__find_program_by_name");
             return Program(ptr);
         }
         return std::nullopt;

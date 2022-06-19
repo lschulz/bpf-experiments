@@ -34,7 +34,7 @@ int run(const char *objPath, const std::vector<int> &interfaces)
     try {
         // Load programs
         auto bpf = Bpf::Object::FromFile(objPath);
-        auto xdp = bpf.findProgramBySection(".xdp");
+        auto xdp = bpf.findProgramByName("xdp_aes");
         if (!xdp)
         {
             std::cerr << "XDP program not found\n" << std::endl;

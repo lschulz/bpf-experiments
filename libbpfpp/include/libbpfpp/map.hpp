@@ -43,6 +43,9 @@ public:
     /// \brief Returns the map's file descriptor.
     virtual int getFd() const = 0;
 
+    std::uint32_t getKeySize() const { return keySize; }
+    std::uint32_t getValueSize() const { return valueSize; }
+
     /// \brief Search for en element in the map and return its value in \p value .
     /// \param[in] key
     /// \param[in] keySize Length of \p key in bytes.
@@ -135,4 +138,4 @@ private:
     FileDesc fd;
 };
 
-} // namespac Bpf
+} // namespace Bpf
