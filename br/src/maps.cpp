@@ -27,6 +27,7 @@
 extern "C" {
 #include "aes/aes.h"
 #include "bpf/common.h"
+#include <arpa/inet.h>
 }
 
 #include <boost/asio/ip/address.hpp>
@@ -165,7 +166,7 @@ void populateIntIfMap(Bpf::Map &intIfMap, const BrConfig &config)
     for (const auto &iface : config.ifs.internal)
     {
         if (iface.ifname.empty()) continue;
-        struct int_iface intIf = {
+        struct endpoint intIf = {
             .port = htons(iface.local.port)
         };
         if (iface.local.ip.is_v4())
@@ -212,7 +213,17 @@ void initPortStats(Bpf::Map &statsMap, const std::vector<unsigned int> &interfac
 
 void initScratchpad(Bpf::Map &scratchpad, const BrConfig &config)
 {
-    std::vector<struct scratchpad> data(sysconf(_SC_NPROCESSORS_ONLN));
+    long nproc = sysconf(_SC_NPROCESSORS_ONLN);
+    std::vector<struct scratchpad> data(nproc);
+
+    auto local_as = config.local_as.toNetworkOrder();
+    auto host_port = htons(config.host_port);
+    for (long i = 0; i < nproc; ++i)
+    {
+        data[i].local_as = local_as;
+        data[i].host_port = host_port;
+    }
+
     uint32_t key = 0;
     scratchpad.update(&key, sizeof(key), data.data(), data.size() * sizeof(struct scratchpad), 0);
 }

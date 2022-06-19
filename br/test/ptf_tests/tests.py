@@ -4,7 +4,7 @@ import ptf
 import ptf.ptfutils
 import pyroute2
 from ptf.base_tests import BaseTest
-from ptf.testutils import group, send_packet, test_param_get
+from ptf.testutils import group, send_packet, test_param_get, verify_no_packet_any
 from scapy.layers.inet import IP, UDP, Ether
 from scapy.layers.inet6 import IPv6
 from scapy.packet import Raw, bind_layers
@@ -14,7 +14,7 @@ from common.port_stats import Counter, PortStatsMap
 from common.util import verify_scion_packet
 
 
-class TestTopology1(BaseTest):
+class TestTopologyBase(BaseTest):
     """Base class for tests using the topology defined in "test/single/setup.bash" and
     "test/multi/setup.bash".
     """
@@ -63,6 +63,8 @@ class TestTopology1(BaseTest):
         self.port_stats.close()
         return BaseTest.tearDown(self)
 
+
+class TestForwarding(TestTopologyBase):
     def _init_single_seg_path(self, ing_ifid, egr_ifid, path, expect_as_ingress, expect_as_egress):
         src_as = "1-ff00:0:{}".format(str(ing_ifid + 1))
         dst_as = "1-ff00:0:{}".format(str(egr_ifid + 1))
@@ -237,7 +239,7 @@ class TestTopology1(BaseTest):
 
 @group("single_device")
 @group("multi_device")
-class DirectlyAttachedTest(TestTopology1):
+class DirectlyAttachedTest(TestForwarding):
     """Test forwarding between two ASes directly attached to the border router under test.
     """
     def runTest(self):
@@ -263,7 +265,7 @@ class DirectlyAttachedTest(TestTopology1):
 
 
 @group("multi_device")
-class ForwardToSiblingTest(TestTopology1):
+class ForwardToSiblingTest(TestForwarding):
     """Test forwarding of packets to a sibling border router.
     """
     def runTest(self):
@@ -288,7 +290,7 @@ class ForwardToSiblingTest(TestTopology1):
 
 
 @group("multi_device")
-class IpForwardTest(TestTopology1):
+class IpForwardTest(TestForwarding):
     """Test forwarding between two sibling border routers.
     """
     def runTest(self):
@@ -310,3 +312,69 @@ class IpForwardTest(TestTopology1):
         self.test_up_segment(ing_port, egr_port, cnt_port, ing_ifid, egr_ifid, ing_enc, egr_enc)
         self.test_core_segment(ing_port, egr_port, cnt_port, ing_ifid, egr_ifid, ing_enc, egr_enc)
         self.test_seg_switch(ing_port, egr_port, cnt_port, ing_ifid, egr_ifid, ing_enc, egr_enc)
+
+
+@group("single_device")
+class TestInboundPacket(TestTopologyBase):
+    """Test forwarding of packets inbound to the AS.
+
+    This test is only executed in single device mode, because it uses the BR to BR links as dummy
+    interfaces to the internal network of the AS.
+    """
+    def setUp(self):
+        super().setUp()
+        bind_layers(UDP, SCION, dport=30041)
+
+    def runTest(self):
+        cnt_port = self.veth_index["veth1"]
+        dst_host = "10.2.0.0" if not test_param_get("ipv6") else "fd00:f00d:cafe:0::0"
+
+        pkt, expected = self.create_packet("1-ff00:0:1", dst_host)
+        before = self.port_stats.get_counter_total(cnt_port, Counter.SCION_FORWARD, sync=True)
+        send_packet(self, (0, 1), pkt)
+        verify_scion_packet(self, expected, (0, 7))
+        after = self.port_stats.get_counter_total(cnt_port, Counter.SCION_FORWARD, sync=True)
+        self.assertEqual((before[0] + len(pkt), before[1] + 1), after)
+
+        pkt, expected = self.create_packet("1-ff00:0:3", dst_host)
+        before = self.port_stats.get_counter_total(cnt_port, Counter.UNDEFINED, sync=True)
+        send_packet(self, (0, 1), pkt)
+        verify_no_packet_any(self, expected, ports=[1, 2, 7, 8])
+        after = self.port_stats.get_counter_total(cnt_port, Counter.UNDEFINED, sync=True)
+        self.assertEqual((before[0] + len(pkt), before[1] + 1), after)
+
+    def create_packet(self, dst_as, dst_host):
+        ing_enc = Ether(src="02:00:00:00:00:00", dst="02:00:00:00:00:01") \
+            / (IP(src="10.1.1.1", dst="10.1.1.2") if not test_param_get("ipv6") else \
+               IPv6(src="fd00:f00d:cafe:1::1", dst="fd00:f00d:cafe:1::2")) \
+            / UDP(sport=50000, dport=50000)
+        egr_enc = Ether(src="02:00:00:00:00:05", dst="02:00:00:00:00:04") \
+            / (IP(src="10.2.0.1", dst="10.2.0.0") if not test_param_get("ipv6") else \
+               IPv6(src="fd00:f00d:cafe:0::1", dst="fd00:f00d:cafe:0::0")) \
+            / UDP(sport=31002, dport=30041)
+        path = SCIONPath(
+            Seg0Len=2, Seg1Len=0, Seg2Len=0,
+            InfoFields=[
+                InfoField(Flags="C")
+            ],
+            HopFields=[
+                HopField(ConsIngress=0, ConsEgress=1),
+                HopField(ConsIngress=1, ConsEgress=0),
+            ]
+        )
+        path.init_path(keys=[
+            self.mac_keys["1-ff00:0:2"],
+            self.mac_keys[dst_as]
+        ], seeds=[bytes(0xffff)])
+        path.egress(self.mac_keys["1-ff00:0:2"])
+        path = SCIONPath(bytes(path))
+        dst = dst_as.split('-')
+        scion = SCION(
+            DstISD=int(dst[0]), DstAS=dst[1],
+            DL=(4 if not test_param_get("ipv6") else 16),
+            DstHostAddr=dst_host,
+            Path=path)
+        return (
+            Ether(bytes(ing_enc/scion/self.payload)),
+            Ether(bytes(egr_enc/scion/self.payload))
+        )

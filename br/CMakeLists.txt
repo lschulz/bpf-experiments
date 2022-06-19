@@ -14,6 +14,7 @@ add_executable(br-loader
     src/ifindex.cpp
     src/maps.cpp
     src/stats.cpp
+    src/scion_addr.cpp
 )
 target_compile_features(br-loader PRIVATE cxx_std_20)
 target_include_directories(br-loader PRIVATE ${CMAKE_SOURCE_DIR}/include)

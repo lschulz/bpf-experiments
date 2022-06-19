@@ -112,8 +112,8 @@ struct ext_link
     u16 local_port;        // in network byte order
 };
 
-/// \brief IP address and UDP port of an AS-internal BR interface.
-struct int_iface
+/// \brief IP address and UDP port of a BR interface or end host.
+struct endpoint
 {
     u32 ip_family;   // AF_INET or AF_INET6
     union {
@@ -140,7 +140,7 @@ struct fwd_info
 
         /// Internal interface address of the next-hop sibling BR.
         /// Valid if `fwd_external == 0`.
-        struct int_iface sibling;
+        struct endpoint sibling;
     };
 };
 
@@ -153,11 +153,12 @@ struct port_stats {
 /// \brief Scratchpad memory for variables that do not fit on the stack.
 struct scratchpad
 {
-    // Verdict if the last operation failed
-    u32 verdict;
+    u32 verdict;   ///< Verdict if the last operation failed
+    u32 last_hop;  ///< Whether the packet is destined to the local AS
 
     // Constants set by the control plane
-    // TODO
+    u64 local_as;  ///< SCION address of the local AS
+    u32 host_port; ///< Dispatcher port in network byte order
 
     // Metadata and copies of updatable fields
     struct

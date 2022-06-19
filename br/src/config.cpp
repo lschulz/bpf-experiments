@@ -233,6 +233,30 @@ std::optional<BrConfig> loadConfig(const char *configFile)
     }
     config.self = *self;
 
+    // Get local IA
+    auto local_as = confTable["local_as"].value<std::string>();
+    if (!local_as)
+    {
+        std::cerr << "Configuration item 'local_as' is missing or has an invalid value.\n";
+        return std::nullopt;
+    }
+    try {
+        config.local_as = IA::from_string(*local_as);
+    }
+    catch (std::invalid_argument &e) {
+        std::cerr << "Invalid 'local_as': " << e.what() << '\n';
+        return std::nullopt;
+    }
+
+    // Get host port
+    auto host_port = confTable["host_port"].value<std::uint16_t>();
+    if (!host_port)
+    {
+        std::cerr << "Configuration item 'host_port' is missing or has an invalid value.\n";
+        return std::nullopt;
+    }
+    config.host_port = *host_port;
+
     // Get path to topology.json
     auto topoFile = confTable["topology"].value<std::string>();
     if (!topoFile)
@@ -328,6 +352,8 @@ std::ostream& operator<<(std::ostream &stream, const BrInterfaces &brIf)
 std::ostream& operator<<(std::ostream &stream, const BrConfig &config)
 {
     stream << "XDP Border Router " << config.self << '\n';
+    stream << "Local AS   : " << config.local_as << '\n';
+    stream << "Dispatcher : " << config.host_port << '\n';
     stream << config.ifs;
     return stream;
 }

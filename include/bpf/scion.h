@@ -46,10 +46,10 @@
 #define SC_GET_VER(sc) (ntohl(sc->ver_qos_flow) >> 28)
 #define SC_GET_QOS(sc) ((ntohl(sc->ver_qos_flow) >> 20) & 0xff)
 #define SC_GET_FLOW(sc) (ntohl(sc->ver_qos_flow) & ((1 << 20ul) - 1))
-#define SC_GET_DT(sc) (sc->haddr & 0x2)
-#define SC_GET_DL(sc) ((sc->haddr >> 2) & 0x2)
-#define SC_GET_ST(sc) ((sc->haddr >> 4) & 0x2)
-#define SC_GET_SL(sc) ((sc->haddr >> 6) & 0x2)
+#define SC_GET_DT(sc) ((sc->haddr >> 6) & 0x03)
+#define SC_GET_DL(sc) ((sc->haddr >> 4) & 0x03)
+#define SC_GET_ST(sc) ((sc->haddr >> 2) & 0x03)
+#define SC_GET_SL(sc) (sc->haddr & 0x03)
 
 struct __attribute__((packed)) scionhdr
 {
@@ -68,10 +68,20 @@ struct __attribute__((packed)) scionhdr
     u16 rsv;          // reserved
 
     // Address header
-    u16 dest_isd;     // destination ISD
-    u8 dest_as[6];    // destination AS
-    u16 src_isd;      // source ISD
-    u8 src_as[6];     // source AS
+    union {
+        struct {
+            u16 dst_isd;  // destination ISD
+            u8 dst_as[6]; // destination AS
+        };
+        u64 dst;
+    };
+    union {
+        struct {
+            u16 src_isd;  // source ISD
+            u8 src_as[6]; // source AS
+        };
+        u64 src;
+    };
 };
 
 /* Standard SCION path */

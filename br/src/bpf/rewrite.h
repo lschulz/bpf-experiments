@@ -138,7 +138,6 @@ inline void rewrite_scion_path(struct scratchpad *this, struct headers *hdr, voi
         ++inf;
         if ((void*)(inf + 1) > data_end) return;
         // For the info field it is more convenient to subtract the old value here.
-        // TODO: Do that for all fields.
         this->udp_residual -= inf->seg_id;
         this->udp_residual += this->path.scion.seg_id[1];
         inf->seg_id = this->path.scion.seg_id[1];

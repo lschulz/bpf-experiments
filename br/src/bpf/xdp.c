@@ -105,6 +105,7 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
     // Headers pointers must be kept on the stack
     struct headers hdr = {};
 
+    this->last_hop = 0;
     this->ip_residual = 0;
     this->udp_residual = 0;
     this->egress_ifindex = -1;
@@ -177,62 +178,70 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
         }
     }
 
-    ///////////////////////////////////////
-    // Determine AS and Egress Interface //
-    ///////////////////////////////////////
+    ///////////////////////////////
+    // FIB Lookup and Forwarding //
+    ///////////////////////////////
 
-    struct infofield *inf = hdr.scion_path.inf;
-    if (this->path.scion.segment_switch)
-    {
-        ++inf;
-        if ((void*)(inf + 1) > data_end) return false;
-    }
-    key = ntohs(INF_GET_CONS(inf)
-        ? hdr.scion_path.hf->egress
-        : hdr.scion_path.hf->ingress);
-    struct fwd_info *fwd = bpf_map_lookup_elem(&egress_map, &key);
-    if (!fwd) return record_verdict(ctx, VERDICT_ABORT);
-
-    /////////////////////////////////////////
-    // FIB Lookup and AS Egress Processing //
-    /////////////////////////////////////////
-
-    int egress_ifindex = -1;
+    int lkup_res = -1;
     init_fib_lookup(this, &hdr, ctx);
-    if (fwd->fwd_external)
+
+    if (this->last_hop)
     {
-        // Forward to next AS on path
-        switch (this->path_type)
-        {
-#ifdef ENABLE_SCION_PATH
-        case SC_PATH_TYPE_SCION:
-            if (!scion_as_egress(this, &hdr, as_ing_ifid, data_end))
-                return record_verdict(ctx, this->verdict);
-        break;
-#endif
-        default:
-            break;
-        }
-        if (fwd->link.ip_family != this->ip.family)
-            return record_verdict(ctx, VERDICT_UNDERLAY_MISMATCH);
-        egress_ifindex = fib_lookup_as_egress(this, ctx, &fwd->link);
+        // Forward to the destination host in our AS
+        lkup_res = forward_to_endhost(this, &hdr, ctx);
     }
     else
     {
-        if (as_ing_ifid != INTERNAL_IFACE)
+        // Determine AS egress interface
+        struct infofield *inf = hdr.scion_path.inf;
+        if (this->path.scion.segment_switch)
         {
-            // Forward packet from another AS to another border router in our AS
-            if (fwd->sibling.ip_family != this->ip.family)
+            ++inf;
+            if ((void*)(inf + 1) > data_end) return false;
+        }
+        key = ntohs(INF_GET_CONS(inf)
+            ? hdr.scion_path.hf->egress
+            : hdr.scion_path.hf->ingress);
+        struct fwd_info *fwd = bpf_map_lookup_elem(&egress_map, &key);
+        if (!fwd) return record_verdict(ctx, VERDICT_ABORT);
+
+        // Forwarding
+        if (fwd->fwd_external)
+        {
+            // Forward to next AS on path
+            switch (this->path_type)
+            {
+#ifdef ENABLE_SCION_PATH
+            case SC_PATH_TYPE_SCION:
+                if (!scion_as_egress(this, &hdr, as_ing_ifid, data_end))
+                    return record_verdict(ctx, this->verdict);
+            break;
+#endif
+            default:
+                break;
+            }
+            if (fwd->link.ip_family != this->ip.family)
                 return record_verdict(ctx, VERDICT_UNDERLAY_MISMATCH);
-            egress_ifindex = fib_lookup_egress_br(this, ctx, &fwd->sibling);
+            lkup_res = forward_scion_link(this, ctx, &fwd->link);
         }
         else
         {
-            // Forward a SCION packet between other (border) routers in our AS
-            egress_ifindex = fib_lookup_ip_forward(this, &hdr, ctx);
+            if (as_ing_ifid != INTERNAL_IFACE)
+            {
+                // Forward packet from another AS to another border router in our AS
+                if (fwd->sibling.ip_family != this->ip.family)
+                    return record_verdict(ctx, VERDICT_UNDERLAY_MISMATCH);
+                lkup_res = forward_internal(this, ctx, &fwd->sibling);
+            }
+            else
+            {
+                // Forward a SCION packet between other (border) routers in our AS
+                lkup_res = forward_outer_ip(this, ctx);
+            }
         }
     }
-    if (egress_ifindex < 0)
+
+    if (lkup_res == LKUP_RES_RETURN)
         return record_verdict(ctx, this->verdict);
 
     //////////////////////
@@ -240,8 +249,7 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
     //////////////////////
 
     rewrite(this, &hdr, data_end);
-
-    this->egress_ifindex = egress_ifindex;
+    this->egress_ifindex = lkup_res;
     return -1;
 }
 

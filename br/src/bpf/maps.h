@@ -52,7 +52,7 @@ struct {
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(key_size, sizeof(u32)); // Interface index
-    __uint(value_size, sizeof(struct int_iface)); // Corresponding IP and UDP port
+    __uint(value_size, sizeof(struct endpoint)); // Corresponding IP and UDP port
     __uint(max_entries, 16);
 } int_iface_map SEC(".maps");
 

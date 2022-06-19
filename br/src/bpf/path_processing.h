@@ -69,7 +69,7 @@ inline bool scion_as_ingress(struct scratchpad *this, struct headers *hdr, void 
         return false;
     }
 
-    // Hop field verifiaction and MAC chaining
+    // Hop field verification and MAC chaining
     u16 beta = ntohs(this->path.scion.seg_id[0]);
     if (!INF_GET_CONS(hdr->scion_path.inf))
     {
@@ -87,12 +87,18 @@ inline bool scion_as_ingress(struct scratchpad *this, struct headers *hdr, void 
     u32 next_hf = this->path.scion.curr_hf + 1;
     if (next_hf >= this->path.scion.num_hf)
     {
+        if (hdr->scion->dst != this->local_as)
+        {
+            this->verdict = VERDICT_DROP;
+            return false;
+        }
         // Path ends in our AS
-        // TODO: Deliver packet to the dispatcher
-        this->verdict = VERDICT_NOT_IMPLEMENTED;
-        return false;
+        // TODO: Check whether the address of the destination host is actually part of our internal
+        // subnet(s). Since we look up the destination address using fib_lookup(), it should be
+        // possible to restrict to which destinations we forward with appropriate netfilter rules.
+        this->last_hop = 1;
     }
-    if (next_hf < this->path.scion.num_hf && next_hf == seg_end)
+    else if (next_hf < this->path.scion.num_hf && next_hf == seg_end)
     {
         // Advance to next path segment
         this->path.scion.segment_switch = 1;
@@ -105,7 +111,6 @@ inline bool scion_as_ingress(struct scratchpad *this, struct headers *hdr, void 
             return false;
         }
     }
-
     return true;
 }
 

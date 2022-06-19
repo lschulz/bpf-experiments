@@ -19,7 +19,10 @@ SCIONLab Coordinator.
 ### Configuration File Format
 The BR configuration is a TOML file containing three keys:
 - `self`: The "name" of the border router as it appears in SCION's configuration
-  (e.g, "br1-ff00_0_1-1").
+  (e.g. "br1-ff00_0_1-1").
+- `local_as`: SCION address of the AS the border router belongs to (e.g. "1-ff00:0:1").
+- `host_port`: Underlay port for delivering packets to end hosts. This should be the port the SCION
+  dispatcher is listening on.
 - `topology`: Path to the `topology.json` file.
 - `internal_interfaces` a list of (IP, UDP port) pairs to be considered as AS internal interfaces.
   At minimum this should contain the "internal_addr" of the BR as configured in `topology.json`.

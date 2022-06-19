@@ -20,6 +20,8 @@
 
 #pragma once
 
+#include "scion_addr.hpp"
+
 #include <boost/asio/ip/address.hpp>
 
 #include <cstdint>
@@ -72,8 +74,10 @@ std::ostream& operator<<(std::ostream &stream, const BrInterfaces &brIf);
 /// \brief The border router root configuration object.
 struct BrConfig
 {
-    std::string self;
-    BrInterfaces ifs;
+    std::string self;        ///< Name of the BR in AS configuration
+    IA local_as;             ///< SCION address of the local AS
+    std::uint16_t host_port; ///< UDP port used by the dispatcher
+    BrInterfaces ifs;        ///< Border router interfaces
 };
 std::ostream& operator<<(std::ostream &stream, const BrConfig &config);
 
