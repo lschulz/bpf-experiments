@@ -135,7 +135,8 @@ public:
 
     ~Object()
     {
-        if (obj) bpf_object__close(obj);
+        // FIXME: double free
+        // if (obj) bpf_object__close(obj);
     }
 
     /// \brief Load all programs contained in the object into the kernel.

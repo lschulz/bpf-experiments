@@ -27,5 +27,7 @@ add_custom_command(
 )
 
 add_subdirectory(libbpfpp)
+add_subdirectory(xdp_pass)
 add_subdirectory(aes)
 add_subdirectory(br)
+add_subdirectory(mac_offload)
