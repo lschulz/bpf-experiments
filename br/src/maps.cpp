@@ -80,6 +80,23 @@ void storeIPv6(const boost::asio::ip::address_v6 &ip, uint8_t *__restrict__ dst)
     "Border router configuration contains IPv6 address, but IPv6 support is deactivated.");
 #endif
 
+void populateCpuMap(Bpf::Map &cpuMap, const BrConfig &config)
+{
+    uint32_t key = 0;
+    for (uint32_t cpu : config.cpus)
+    {
+        cpuMap.update(&key, sizeof(key), &cpu, sizeof(cpu), 0);
+        key++;
+    }
+}
+
+void populateCpuCount(Bpf::Map &cpuCount, const BrConfig &config)
+{
+    uint32_t key = 0;
+    uint32_t value = static_cast<uint32_t>(config.cpus.size());
+    cpuCount.update(&key, sizeof(key), &value, sizeof(value), 0);
+}
+
 #ifdef ENABLE_HF_CHECK
 void populateSBox(Bpf::Map &sboxMap)
 {
@@ -247,6 +264,16 @@ void initializeMaps(
 {
     const char *mapName = nullptr;
     std::optional<Bpf::BpfLibMap> map;
+
+    mapName = "cpu_map";
+    map = bpf.findMapByName(mapName, BPF_MAP_TYPE_ARRAY);
+    if (map) populateCpuMap(*map, config);
+    else printWarning(mapName);
+
+    mapName = "cpu_count";
+    map = bpf.findMapByName(mapName, BPF_MAP_TYPE_ARRAY);
+    if (map) populateCpuCount(*map, config);
+    else printWarning(mapName);
 
 #ifdef ENABLE_HF_CHECK
     mapName = "AES_SBox";

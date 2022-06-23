@@ -1,6 +1,7 @@
 self = "br1-ff00_0_1-1"
 local_as = "1-ff00:0:1"
 host_port = 30041
+cpus = "0"
 topology = "br_config/topology.json"
 internal_interfaces = [
     {ip = "10.2.0.1", port = 31002},

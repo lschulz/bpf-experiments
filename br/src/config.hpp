@@ -74,10 +74,11 @@ std::ostream& operator<<(std::ostream &stream, const BrInterfaces &brIf);
 /// \brief The border router root configuration object.
 struct BrConfig
 {
-    std::string self;        ///< Name of the BR in AS configuration
-    IA local_as;             ///< SCION address of the local AS
-    std::uint16_t host_port; ///< UDP port used by the dispatcher
-    BrInterfaces ifs;        ///< Border router interfaces
+    std::string self;                ///< Name of the BR in AS configuration
+    IA local_as;                     ///< SCION address of the local AS
+    std::uint16_t host_port;         ///< UDP port used by the dispatcher
+    std::vector<std::uint32_t> cpus; ///< CPUs to bind packet handlers to
+    BrInterfaces ifs;                ///< Border router interfaces
 };
 std::ostream& operator<<(std::ostream &stream, const BrConfig &config);
 

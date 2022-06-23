@@ -32,7 +32,7 @@ Running this evaluation requires Scapy, tcpreplay, and [BCC](https://github.com/
 
 Standalone XDP BR
 -----------------
-The following commands were used to test the XDP BR independent of the other SCION services:
+The following commands were used to test the XDP BR independently of the other SCION services:
 ```bash
 PROJECT_DIR=<root of the repository>
 # Create virtual links
@@ -186,3 +186,44 @@ in AS 2, throughput increases to around 1&nbsp;Mpps -- a four times increase. It
 that the reference BR alone was utilizing all CPUs to some extent with a total CPU utilization of
 more than a single core, whereas the XDP-BR pinned a single CPU at exactly 100% utilization.
 Additional testing will be required outside of a VM and on real Ethernet devices.
+
+
+Update: Multi-CPU Support
+-------------------------
+This update adds support for multiple kernel threads by attaching the XDP border router to a
+CPUMAP. CPUMAPs allow an XDP program to redirect a packet to another CPU where it is either passed
+to userspace or to processed by another XDP program. We make use of the latter case to distribute
+packets over multiple CPUs without relying and hardware/driver support for RSS.
+
+For the evaluation we pinned `tcpreplay` to CPU 0 by invoking it with `taskset`:
+```bash
+sudo taskset 0x01 tcpreplay -i veth0 --topspeed -K --loop=10000 xdp_pkts.pcap
+```
+
+Assigning `tcpreplay` to CPU 0 ensures that the initial XDP program handling the load balancing
+between the worker threads will also run on CPU 0. The worker threads of the border router where
+assigned to CPUs 3 to 7.
+
+Using the same evaluation setup as in the previous experiments, we obtained the following results:
+
+Test: Standalone XDP BR with AES
+The table lists the number of BR worker threads and the utilization on CPU cores 0, 4, 5, 6, and 7
+as displayed by `htop` in addition to the achieved throughput.
+| Threads | Throughput | Core 0 | Core 4 | Core 5 | Core 6 | Core 7 |
+|---------|-----------:|-------:|-------:|-------:|-------:|-------:|
+| 1       | 0.870 Mpps |   100% |    7 % |        |        |        |
+| 2       | 0.711 Mpps |   100% |   16 % |   18 % |        |        |
+| 3       | 0.636 Mpps |   100% |    8 % |    5 % |    8 % |        |
+| 4       | 0.485 Mpps |   100% |   10 % |   10 % |    8 % |    5 % |
+
+Throughput is limited by the processing on CPU 0 where tcpreplay generated the packets. Adding more
+worker threads decreases overall throughput. Nevertheless, we can see that CPU utilization on the BR
+worker threads is rather low indicating that the XDP router should be capable of processing many
+millions of packets per second even without hardware-accelerated AES.
+
+The next logical step is to analyze the poor performance of the load balancing thread on CPU 0. We
+suspect that moving the packet generator to another machine entirely and attaching the BR to a real
+NIC would yield much better throughput. In case the load balancing in XDP remains a bottleneck, we
+can make use of RSS in hardware to distribute the packet-in interrupts over many CPUs. It is
+possible to provide sufficient entropy to RSS by randomizing the source port in the SCION underlay
+for every packet.

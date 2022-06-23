@@ -25,7 +25,7 @@ target_link_libraries(br-loader PRIVATE Boost::json)
 target_link_libraries(br-loader PRIVATE Threads::Threads)
 
 # XDP Border Router (BPF)
-set(XDP_BR_SRC src/bpf/xdp.c)
+set(XDP_BR_SRC src/bpf/xdp.c src/bpf/load_balancer.c)
 if(ENABLE_HF_CHECK)
     list(APPEND XDP_BR_SRC ${CMAKE_SOURCE_DIR}/aes/src/aes.c)
 endif()

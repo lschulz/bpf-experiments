@@ -19,7 +19,7 @@
 // SOFTWARE.
 
 extern "C" {
-    #include "bpf/common.h"
+#include "bpf/common.h"
 #include "aes/aes.h"
 #include <net/if.h>
 #include <linux/if_link.h>

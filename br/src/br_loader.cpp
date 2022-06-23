@@ -108,13 +108,15 @@ int attachBr(int argc, char* argv[])
 
     // Load XDP program
     auto bpf = Bpf::Object::FromFile(argv[0]);
-    auto xdp = bpf.findProgramByName("border_router");
-    if (!xdp)
+    auto xdpLoadBalancer = bpf.findProgramByName("round_robin_dist");
+    auto xdpRouter = bpf.findProgramByName("border_router");
+    if (!xdpLoadBalancer || !xdpRouter)
     {
-        std::cerr << "XDP program not found\n" << std::endl;
+        std::cerr << "XDP program not found\n";
         return -1;
     }
-    xdp->setType(BPF_PROG_TYPE_XDP);
+    xdpLoadBalancer->setExpectedAttachType(BPF_XDP);
+    xdpRouter->setExpectedAttachType(BPF_XDP_CPUMAP);
 
 #ifdef ENABLE_HF_CHECK
     bool reuseKeyMap = bpf.reusePinnedMap("mac_key_map", macKeyMapPath.c_str());
@@ -127,6 +129,12 @@ int attachBr(int argc, char* argv[])
 
     bpf.load();
     initializeMaps(bpf, *config, interfaces);
+    auto cpuRedirectMap = bpf.findMapByName("cpu_redirect_map", BPF_MAP_TYPE_CPUMAP);
+    if (!cpuRedirectMap)
+    {
+        std::cerr << "cpu_redirect_map not found\n";
+        return -1;
+    }
 
     // Pin maps that we need to read or update later
 #ifdef ENABLE_HF_CHECK
@@ -142,9 +150,19 @@ int attachBr(int argc, char* argv[])
         if (map) map->pin(portStatsMapPath.c_str());
     }
 
+    // Attach BR to CPU redirection map
+    for (uint32_t cpu : config->cpus)
+    {
+        struct bpf_cpumap_val value = {
+            .qsize = 192,
+            .bpf_prog{ .fd = xdpRouter->getFd() }
+        };
+        cpuRedirectMap->update(&cpu, sizeof(cpu), &value, sizeof(value), BPF_EXIST);
+    }
+
     // Attach XDP
     for (int ifindex : interfaces)
-        xdp->attachXDP(ifindex, XDP_FLAGS_DRV_MODE);
+        xdpLoadBalancer->attachXDP(ifindex, XDP_FLAGS_DRV_MODE);
     std::cout << "XDP-BR attached\n";
 
     return EXIT_SUCCESS;

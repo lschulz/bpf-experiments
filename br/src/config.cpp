@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 #include "config.hpp"
+#include "bpf/map_limits.h"
 
 #include <sys/types.h>
 #include <ifaddrs.h>
@@ -27,6 +28,7 @@
 #include <boost/json.hpp>
 #include <boost/lexical_cast.hpp>
 
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -131,6 +133,53 @@ void parseTopology(const boost::json::value &topo, const std::string &self, BrIn
             }
         }
     }
+}
+
+/// \brief Parse a list of CPUs.
+/// \details Parses a comma separated list of decimal CPU indices. List entries can be ranges of
+/// CPUs given by the first and last index in the range (both inclusive) separated by a dash.
+/// Example: `parseCpuList("0,1,2-4") == { 0, 1, 2, 3, 4 }`
+/// \exception std::invalid_argument String format is invalid
+/// \exception std::out_of_range CPU index is out of range
+/// \return Sorted list of CPU indices without duplicates.
+std::vector<uint32_t> parseCpuList(const std::string &str)
+{
+    std::vector<uint32_t> cpus;
+    const int maxCpus = std::min((int)sysconf(_SC_NPROCESSORS_ONLN), MAX_CPUS);
+
+    // Parse list to vector, expand ranges
+    std::stringstream stream(str);
+    while (stream.good())
+    {
+        uint32_t firstCpu = 0, lastCpu = 0;
+        stream >> firstCpu;
+        if (!stream) throw std::invalid_argument("Invalid CPU index");
+        if (firstCpu >= maxCpus) throw std::out_of_range("CPU index out of range");
+        if (stream.peek() == '-')
+        {
+            stream.ignore(1);
+            stream >> lastCpu;
+            if (!stream) throw std::invalid_argument("Invalid CPU index");
+            if (lastCpu >= maxCpus) throw std::out_of_range("CPU index out of range");
+            for (uint32_t i = firstCpu; i <= lastCpu; ++i)
+                cpus.push_back(i);
+        }
+        else
+            cpus.push_back(firstCpu);
+        if (!stream.eof())
+        {
+            if (stream.peek() == ',')
+                stream.ignore(1);
+            else
+                throw std::invalid_argument("Unexpected character in CPU list");
+        }
+    }
+
+    // Sort CPU list and remove duplicates
+    std::sort(cpus.begin(), cpus.end());
+    cpus.erase(std::unique(cpus.begin(), cpus.end()), cpus.end());
+
+    return cpus;
 }
 
 /// \brief Read the internal interface table from the main configuration file.
@@ -257,6 +306,21 @@ std::optional<BrConfig> loadConfig(const char *configFile)
     }
     config.host_port = *host_port;
 
+    // Get CPUs
+    auto cpus = confTable["cpus"].value<std::string>();
+    if (!cpus)
+    {
+        std::cerr << "Configuration item 'cpus' is missing or has an invalid value.\n";
+        return std::nullopt;
+    }
+    try {
+        config.cpus = parseCpuList(*cpus);
+    }
+    catch (std::exception &e) {
+        std::cerr << "Invalid CPU list: " << e.what() << '\n';
+        return std::nullopt;
+    }
+
     // Get path to topology.json
     auto topoFile = confTable["topology"].value<std::string>();
     if (!topoFile)
@@ -354,6 +418,16 @@ std::ostream& operator<<(std::ostream &stream, const BrConfig &config)
     stream << "XDP Border Router " << config.self << '\n';
     stream << "Local AS   : " << config.local_as << '\n';
     stream << "Dispatcher : " << config.host_port << '\n';
+
+    stream << "CPUs       : ";
+    auto cpu = config.cpus.cbegin(), end = config.cpus.cend();
+    if (cpu != end)
+        stream << *cpu++;
+    for (; cpu != end; ++cpu)
+        stream << ", " << *cpu;
+    stream << '\n';
+
     stream << config.ifs;
+
     return stream;
 }

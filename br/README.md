@@ -23,6 +23,14 @@ The BR configuration is a TOML file containing three keys:
 - `local_as`: SCION address of the AS the border router belongs to (e.g. "1-ff00:0:1").
 - `host_port`: Underlay port for delivering packets to end hosts. This should be the port the SCION
   dispatcher is listening on.
+- `cpus`: List of CPUs for packet processing. The XDP border router distributes packets to kernel
+  threads running on the CPUs in this list. This setting controls the placement of router processes
+  only. Which CPUs initially receive the packets and subsequential send them to one of the XDP
+  threads depends on which CPUs handle interrupts from the NIC.<br/>
+  Syntax examples:
+  - "0,1,2,3" -> { 0, 1, 2, 3 }
+  - "0-3" -> { 0, 1, 2, 3 }
+  - "3-0, 1, 1-2" -> { 1, 2 }
 - `topology`: Path to the `topology.json` file.
 - `internal_interfaces` a list of (IP, UDP port) pairs to be considered as AS internal interfaces.
   At minimum this should contain the "internal_addr" of the BR as configured in `topology.json`.
