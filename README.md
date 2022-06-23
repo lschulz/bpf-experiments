@@ -9,9 +9,11 @@ directly in XDP.
 - [/aes](/aes) Implementation of AES-CMAC for use in XDP as required by SCION.
 - [/br](/br) The SCION XDP border router.
   - [/br/evaluation](/br/evaluation) contains some preliminary evaluation results.
+- [/mac_offload](/mac_offload) Offload AES-CMAC validation from a switch to XDP.
 - [/libbpfpp](/libbpfpp) C++ wrappers for libbpf
 - [/libbpfpy](/libbpfpy) Python helpers for interfacing with libbpf
 - [/scion](/scion) Some scripts for testing the XDP router in a dockerized local SCION topology.
+- [/utils](/utils) Helper scripts for running the tests.
 
 Building
 --------
