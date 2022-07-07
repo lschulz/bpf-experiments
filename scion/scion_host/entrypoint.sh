@@ -1,6 +1,6 @@
 #!/bin/bash
 
-appdeps.py --file-wait gen/links_established
+appdeps.py --file-wait gen/links_ready
 
 # Start AS processes
 supervisorctl -c supervisor/supervisord.conf start dispatcher

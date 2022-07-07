@@ -26,11 +26,15 @@ DOCKER_IMAGE=scion_host:latest
 COMPOSE_FILE=$SCRIPT_DIR/docker-compose-star.yaml
 COMPOSE_PROJECT=xdp-br
 
+SCION_ROOT=${SCION_ROOT:="$HOME/scion"}
+SCION_APPS=${SCION_APPS:="$HOME/scion-apps"}
+
 # Export paths so they are visible in the compose file
+export PROJECT_DIR
 export TOPO_DIR=${PWD}
 export BUILD_DIR=${PROJECT_DIR}/build
-export SCION_ROOT=${HOME}/scion
-export SCION_APPS=${HOME}/scion-apps
+export SCION_ROOT
+export SCION_APPS
 
 . helper.bash
 
@@ -61,7 +65,7 @@ disable_checksum_offload() {
 # Load a pass-through program on interfaces that would otherwise not have an XDP program and
 # therefore could not received packets passed from another XDP program.
 load_xdp_pass() {
-    local XDP_PASS=${BUILD_DIR}/br/xdp_pass.c.o
+    local XDP_PASS=${BUILD_DIR}/xdp_pass/xdp_pass.c.o
     sudo ip netns exec as2 ip link set dev veth9 xdp object "${XDP_PASS}" section xdp
     sudo ip netns exec as3 ip link set dev veth11 xdp object "${XDP_PASS}" section xdp
     sudo ip netns exec as4 ip link set dev veth13 xdp object "${XDP_PASS}" section xdp
@@ -141,7 +145,7 @@ set_as1_routes() {
 ## Commands ##
 ##############
 
-cmd_build() {
+cmd_build_image() {
     # Build docker image
     docker build --build-arg SCION_UID=$(id -u $LOGNAME) --build-arg SCION_GID=$(id -g $LOGNAME) \
     -t ${DOCKER_IMAGE} ./scion_host
@@ -161,7 +165,7 @@ cmd_run() {
     ./scion.sh topology -c "$SCRIPT_DIR/topologies/star.yaml"
     popd
 
-    rm -f "$SCION_ROOT/gen/links_established"
+    rm -f "$SCION_ROOT/gen/links_ready"
 
     # Rewrite AS ff00:0:1 internal network IPs
     set_control_addr 1-ff00:0:1 10.2.0.0:31000
@@ -239,7 +243,7 @@ EOF
     set_as1_routes
 
     # Signal containers to start SCION
-    echo '1' > "$SCION_ROOT/gen/links_established"
+    echo '1' > "$SCION_ROOT/gen/links_ready"
 }
 
 cmd_stop() {
@@ -281,6 +285,17 @@ cmd_detach_xdp() {
         "../bpf/br/br-loader detach veth16 veth18 veth5 veth6"
 }
 
+cmd_set_key() {
+    sudo "$BUILD_DIR/br/br-loader" key add br1-ff00_0_1-1 0 $1
+    sudo "$BUILD_DIR/br/br-loader" key add br1-ff00_0_1-2 0 $1
+    sudo "$BUILD_DIR/br/br-loader" key add br1-ff00_0_1-3 0 $1
+    sudo "$BUILD_DIR/br/br-loader" key add br1-ff00_0_1-4 0 $1
+}
+
+cmd_watch() {
+    docker exec -it -u root "$1" bash -c "../bpf/br/br-loader watch $2 $3"
+}
+
 cmd_logs() {
     docker-compose logs
 }
@@ -300,11 +315,23 @@ cmd_clean() {
 ## Entry point ##
 #################
 
+HELP_MESSAGE="Usage: ./scion <command>
+Commands:
+  - build_image           : Build the SCION Docker image
+  - run                   : Run the topology
+  - attach_xdp            : Attach the BPF border routers
+  - detach_xdp            : Detach the BPF border routers
+  - set_key <key>         : Set MAC verification key
+  - watch <cnt> <br> <if> : Watch BR statistics
+  - logs                  : Show docker-compose logs
+  - enter <cnt>           : Start an interactive shell in the given container
+  - stop                  : Stop the topology and remove the containers and networks
+  - clean                 : Delete generated files and unpin BPF maps"
+
 COMMAND=$1
 shift
-
 case "$COMMAND" in
-    build|run|stop|attach_xdp|detach_xdp|logs|enter|clean)
+    build_image|run|stop|attach_xdp|detach_xdp|set_key|watch|logs|enter|clean)
         "cmd_$COMMAND" "$@" ;;
-    *) echo "Command no recognized"; exit 1 ;;
+    *) echo "$HELP_MESSAGE"; exit 1 ;;
 esac
