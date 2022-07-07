@@ -85,7 +85,7 @@ UdpEp parseUdpEp(const boost::json::string &str)
         ipStr.remove_suffix(1);
 
     return UdpEp{
-        .ip = make_address(ipStr.to_string()),
+        .ip = make_address(std::string(ipStr)),
         .port = boost::lexical_cast<std::uint16_t>(portStr),
     };
 }

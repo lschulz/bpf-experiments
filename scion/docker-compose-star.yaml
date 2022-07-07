@@ -15,8 +15,9 @@ services:
       - ${SCION_ROOT:?}/logs:/home/scion/scion/logs
       - ${BUILD_DIR:?}:/home/scion/bpf:ro
       - ${TOPO_DIR:?}/br_config:/home/scion/br_config:ro
-      - /usr/local/lib/libboost_json.so.1.78.0:/usr/local/lib/libboost_json.so.1.78.0:ro
-      - /usr/local/lib/libboost_container.so.1.78.0:/usr/local/lib/libboost_container.so.1.78.0:ro
+      - ${PROJECT_DIR:?}/libbpf/src/libbpf.so.0:/lib/x86_64-linux-gnu/libbpf.so.0:ro
+      - /usr/local/lib/libboost_json.so.1.79.0:/usr/local/lib/libboost_json.so.1.79.0:ro
+      - /usr/local/lib/libboost_container.so.1.79.0:/usr/local/lib/libboost_container.so.1.79.0:ro
       - /sys/fs/bpf:/sys/fs/bpf # required to pin BPF maps from inside the container
     cap_add:
       - NET_ADMIN
@@ -36,8 +37,9 @@ services:
       - ${SCION_ROOT:?}/logs:/home/scion/scion/logs
       - ${BUILD_DIR:?}:/home/scion/bpf:ro
       - ${TOPO_DIR:?}/br_config:/home/scion/br_config:ro
-      - /usr/local/lib/libboost_json.so.1.78.0:/usr/local/lib/libboost_json.so.1.78.0:ro
-      - /usr/local/lib/libboost_container.so.1.78.0:/usr/local/lib/libboost_container.so.1.78.0:ro
+      - ${PROJECT_DIR:?}/libbpf/src/libbpf.so.0:/lib/x86_64-linux-gnu/libbpf.so.0:ro
+      - /usr/local/lib/libboost_json.so.1.79.0:/usr/local/lib/libboost_json.so.1.79.0:ro
+      - /usr/local/lib/libboost_container.so.1.79.0:/usr/local/lib/libboost_container.so.1.79.0:ro
       - /sys/fs/bpf:/sys/fs/bpf # required to pin BPF maps from inside the container
     cap_add:
       - NET_ADMIN
@@ -57,8 +59,9 @@ services:
       - ${SCION_ROOT:?}/logs:/home/scion/scion/logs
       - ${BUILD_DIR:?}:/home/scion/bpf:ro
       - ${TOPO_DIR:?}/br_config:/home/scion/br_config:ro
-      - /usr/local/lib/libboost_json.so.1.78.0:/usr/local/lib/libboost_json.so.1.78.0:ro
-      - /usr/local/lib/libboost_container.so.1.78.0:/usr/local/lib/libboost_container.so.1.78.0:ro
+      - ${PROJECT_DIR:?}/libbpf/src/libbpf.so.0:/lib/x86_64-linux-gnu/libbpf.so.0:ro
+      - /usr/local/lib/libboost_json.so.1.79.0:/usr/local/lib/libboost_json.so.1.79.0:ro
+      - /usr/local/lib/libboost_container.so.1.79.0:/usr/local/lib/libboost_container.so.1.79.0:ro
       - /sys/fs/bpf:/sys/fs/bpf # required to pin BPF maps from inside the container
     cap_add:
       - NET_ADMIN
@@ -78,8 +81,9 @@ services:
       - ${SCION_ROOT:?}/logs:/home/scion/scion/logs
       - ${BUILD_DIR:?}:/home/scion/bpf:ro
       - ${TOPO_DIR:?}/br_config:/home/scion/br_config:ro
-      - /usr/local/lib/libboost_json.so.1.78.0:/usr/local/lib/libboost_json.so.1.78.0:ro
-      - /usr/local/lib/libboost_container.so.1.78.0:/usr/local/lib/libboost_container.so.1.78.0:ro
+      - ${PROJECT_DIR:?}/libbpf/src/libbpf.so.0:/lib/x86_64-linux-gnu/libbpf.so.0:ro
+      - /usr/local/lib/libboost_json.so.1.79.0:/usr/local/lib/libboost_json.so.1.79.0:ro
+      - /usr/local/lib/libboost_container.so.1.79.0:/usr/local/lib/libboost_container.so.1.79.0:ro
       - /sys/fs/bpf:/sys/fs/bpf # required to pin BPF maps from inside the container
     cap_add:
       - NET_ADMIN
