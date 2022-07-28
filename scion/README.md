@@ -10,16 +10,18 @@ four containers as1br1 to as1br4 each running a border routers. The border route
 can be replaced/augmented with the XDP router. Internal routing in AS ff00:0:1 is configured through
 static routes.
 
-To run the XDP border router in context of the other SCION services, you first need to clone and
-build SCION (by default expected in in ~/scion):
-```bash
-git clone https://github.com/netsec-ethz/scion.git
-pushd scion
-./scion.sh bazel_remote
-./scion.sh build
-popd
-```
+### Requirements
+- Docker and docker-compose (https://docs.docker.com/engine/install/ubuntu/)
+- jq (`sudo apt install jq`)
+- yq (`pip3 install yq`)
+- [SCION](https://github.com/netsec-ethz/scion)
+- [SCION-Apps](https://github.com/netsec-ethz/scion-apps)
 
+Build SCION and (if you need them) the SCION apps. Set the environment variables `SCION_ROOT`
+(default: `$HOME/scion`) and `SCION_APPS` (default: `$HOME/scion-apps`) to point to the scion and
+scion-apps source trees, respectively.
+
+### Usage
 The test topology is created by running `./scion run`. You should be able to enter the AS containers
 and experiment with the `scion ping` command and the bandwidth tester. The XDP border routers are
 attached by running `./scion attach_xdp` and can be deactivated again with `./scion detach_xdp`.

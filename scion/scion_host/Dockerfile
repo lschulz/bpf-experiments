@@ -1,4 +1,4 @@
-from ubuntu:21.10
+from ubuntu:22.04
 
 ARG SCION_UID=1000
 ARG SCION_GID=1000

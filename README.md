@@ -15,6 +15,30 @@ directly in XDP.
 - [/scion](/scion) Some scripts for testing the XDP router in a dockerized local SCION topology.
 - [/utils](/utils) Helper scripts for running the tests.
 
+Requirements
+------------
+- Kernel >= 5.15
+  - Ubuntu >= 22.04
+  - Ubuntu >= 20.04.5
+- llvm and clang
+- pkg-config
+- libelf
+- patchelf
+- bpftool (linux-tools-common)
+- doctest (doctest-dev)
+- cmake >= 3.16
+- boost >= 1.78
+- Python 3.10
+
+Make sure `/usr/include/asm`, `/usr/include/bits` and `/usr/include/sys` are available. Either
+install `gcc-multilib` or manually create symlinks from `/usr/include/x86_64-linux-gnu/`:
+```bash
+sudo ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/asm
+sudo ln -s /usr/include/x86_64-linux-gnu/bits /usr/include/bits
+sudo mkdir /usr/include/sys
+sudo ln -s /usr/include/x86_64-linux-gnu/sys/* /usr/include/sys
+```
+
 Building
 --------
 Clone with `--recurse-submodules` or initialize the submodules after cloning:
