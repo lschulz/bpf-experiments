@@ -28,7 +28,7 @@ XDP_PASS="$PROJECT_DIR/build/xdp_pass/xdp_pass.c.o"
 
 PTF="$PROJECT_DIR/ptf/ptf"
 TEST_DIR="$SCRIPT_DIR/ptf_tests"
-PTF_PYPATH="--pypath $PROJECT_DIR/mac_offload/python"
+PTF_PYPATH="--pypath $PROJECT_DIR/scapy-scion-int --pypath $PROJECT_DIR/mac_offload/python"
 
 KEY="MTExMTExMTExMTExMTExMQ=="
 CPU_MASK=6
@@ -52,5 +52,5 @@ sudo ip link set dev veth1 xdp off
 sudo ip link set dev veth2 xdp off
 sudo ip link set dev veth3 xdp off
 
-# echo "=== Veth Teardown ==="
+echo "=== Veth Teardown ==="
 ./veth_teardown.bash
