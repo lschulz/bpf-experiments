@@ -29,6 +29,7 @@ extern "C" {
 
 #include <cstdint>
 #include <utility>
+#include <functional>
 
 
 namespace Bpf {
@@ -136,6 +137,59 @@ private:
 
 private:
     FileDesc fd;
+};
+
+class Ringbuf
+{
+public:
+    using SampleFn = std::function<int(void*, size_t)>;
+
+    Ringbuf(int fd, SampleFn sampleFn)
+        : buffer(nullptr)
+        , sampleFn(std::move(sampleFn))
+    {
+        buffer = ring_buffer__new(fd, &callback, this, nullptr);
+        if (!buffer) throw BpfError(0, "Cannot open ringbuffer");
+    }
+
+    ~Ringbuf()
+    {
+        ring_buffer__free(buffer);
+    }
+
+    Ringbuf(const Ringbuf &other) = delete;
+    Ringbuf& operator=(const Ringbuf &other) = delete;
+    Ringbuf(Ringbuf &&other) = delete;
+    Ringbuf& operator=(Ringbuf &&other) = delete;
+
+    void pollLoop()
+    {
+        while (true)
+        {
+            int err = ring_buffer__poll(buffer, 0);
+            if (err == -EINTR)
+                return; // Interrupted, e.g. by Ctrl+C
+            else if (err < 0)
+                throw BpfError(err, "Polling ringbuffer failed");
+        }
+    }
+
+protected:
+    int handleData(void *data, size_t size)
+    {
+        return sampleFn(data, size);
+    }
+
+private:
+    static int callback(void *ctx, void *data, size_t size)
+    {
+        auto self = reinterpret_cast<Ringbuf*>(ctx);
+        return self->handleData(data, size);
+    }
+
+private:
+    struct ring_buffer *buffer;
+    SampleFn sampleFn;
 };
 
 } // namespace Bpf

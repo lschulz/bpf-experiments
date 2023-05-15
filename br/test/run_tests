@@ -27,7 +27,7 @@ function print_help() {
   echo "  -6"
   echo "    Use IPv6 underlay."
   echo "  --single"
-  echo "    Run single device tests. Cannot be used together with --single."
+  echo "    Run single device tests. Cannot be used together with --multi."
   echo "  --multi"
   echo "    Run multi-device tests. This is the default if --single is not specified."
   echo "  --tests"

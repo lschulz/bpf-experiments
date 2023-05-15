@@ -26,6 +26,7 @@
 #include "path_processing.h"
 #include "fib_lookup.h"
 #include "rewrite.h"
+#include "debug.h"
 
 #ifdef ENABLE_HF_CHECK
 #include "aes/aes.h"
@@ -55,6 +56,54 @@ int record_verdict(struct xdp_md *ctx, enum verdict verdict)
 {
     if (!ctx) return XDP_ABORTED;
 
+#ifdef XDP_DEBUG_PRINT
+    switch (verdict)
+    {
+    case VERDICT_ABORT:
+        printf("VERDICT: ABORT (XDP_ABORTED)\n");
+        break;
+    case VERDICT_DROP:
+        printf("VERDICT: DROP (XDP_DROP)\n");
+        break;
+    case VERDICT_PASS:
+        printf("VERDICT: PASS (XDP_PASS)\n");
+        break;
+    case VERDICT_TX:
+        printf("VERDICT: TX (XDP_TX)\n");
+        break;
+    case VERDICT_SCION_FORWARD:
+        printf("VERDICT: SCION_FORWARD (XDP_REDIRECT)\n");
+        break;
+    case VERDICT_PARSE_ERROR:
+        printf("VERDICT: PARSE_ERROR (XDP_DROP)\n");
+        break;
+    case VERDICT_NOT_SCION:
+        printf("VERDICT: NOT_SCION (XDP_PASS)\n");
+        break;
+    case VERDICT_NOT_IMPLEMENTED:
+        printf("VERDICT: NOT_IMPLEMENTED (XDP_PASS)\n");
+        break;
+    case VERDICT_NO_INTERFACE:
+        printf("VERDICT: NO_INTERFACE (XDP_DROP)\n");
+        break;
+    case VERDICT_UNDERLAY_MISMATCH:
+        printf("VERDICT: UNDERLAY_MISMATCH (XDP_PASS)\n");
+        break;
+    case VERDICT_ROUTER_ALERT:
+        printf("VERDICT: ROUTER_ALERT (XDP_PASS)\n");
+        break;
+    case VERDICT_FIB_LKUP_DROP:
+        printf("VERDICT: FIB_LKUP_DROP (XDP_DROP)\n");
+        break;
+    case VERDICT_FIB_LKUP_PASS:
+        printf("VERDICT: FIB_LKUP_PASSORT (XDP_PASS)\n");
+        break;
+    case VERDICT_INVALID_HF:
+        printf("VERDICT: INVALID_HF (XDP_DROP)\n");
+        break;
+    }
+#endif
+
     // We don't need atomic operations since we are using a percpu map.
     u32 ingress_ifindex = ctx->ingress_ifindex;
     struct port_stats *stats = bpf_map_lookup_elem(&port_stats_map, &ingress_ifindex);
@@ -81,15 +130,22 @@ int verify_hop_field(struct macinput *input, u64 expected)
     // Key lookup
     u32 index = 0;
     struct hop_key *key = bpf_map_lookup_elem(&mac_key_map, &index);
-    if (!key) return false; // can't verify hop field without a key
+    if (!key)
+    {
+        printf("    ERROR: No verification key\n");
+        return false; // can't verify hop field without a key
+    }
 
     struct aes_cmac mac;
     aes_cmac_16bytes((struct aes_block*)input, &key->key, &key->subkey, &mac);
 
     u64 actual = *(u64*)mac.w & 0x0000ffffffffffff;
+
+    printf("    Computed MAC %012x (expected: %012x)\n", actual, expected);
     return actual == expected;
 }
 #endif // ENABLE_HF_CHECK
+
 
 /// \brief Main packet processing function, does almost everything except hop field verification
 /// and setting up the packet redirection.
@@ -101,6 +157,7 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
 
     void *data = (void*)(long)ctx->data;
     void *data_end = (void*)(long)ctx->data_end;
+    printf("  packet length = %d\n", data_end - data);
 
     // Headers pointers must be kept on the stack
     struct headers hdr = {};
@@ -117,6 +174,8 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
     // Parsing //
     /////////////
 
+    printf("  === Parser ===\n");
+
     data = parse_underlay(this, &hdr, data, data_end);
     if (!data) return record_verdict(ctx, this->verdict);
 
@@ -126,6 +185,8 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
     ////////////////////////////////////
     // Determine AS Ingress Interface //
     ////////////////////////////////////
+
+    printf("  === Ingress ===\n");
 
     u32 as_ing_ifid = INTERNAL_IFACE;
     u32 key = ctx->ingress_ifindex;
@@ -154,9 +215,11 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
             hf_ingress = hdr.scion_path.hf->ingress;
         else
             hf_ingress = hdr.scion_path.hf->egress;
+        printf("    hf ingress ifid = %d\n", as_ing_ifid);
         if (ntohs(hf_ingress) != as_ing_ifid)
             return record_verdict(ctx, VERDICT_NO_INTERFACE);
     }
+    printf("    ingress ifid = %d\n", as_ing_ifid);
 
     ///////////////////////////
     // AS Ingress Processing //
@@ -182,17 +245,21 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
     // FIB Lookup and Forwarding //
     ///////////////////////////////
 
+    printf("  === Forwarding ===\n");
+
     int lkup_res = -1;
     init_fib_lookup(this, &hdr, ctx);
 
     if (this->last_hop)
     {
         // Forward to the destination host in our AS
+        printf("     ## FIB lookup for destination host in local AS ##\n");
         lkup_res = forward_to_endhost(this, &hdr, ctx);
     }
     else
     {
         // Determine AS egress interface
+        printf("    ## Determine AS egress interface ##\n");
         struct infofield *inf = hdr.scion_path.inf;
         if (this->path.scion.segment_switch)
         {
@@ -203,12 +270,19 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
             ? hdr.scion_path.hf->egress
             : hdr.scion_path.hf->ingress);
         struct fwd_info *fwd = bpf_map_lookup_elem(&egress_map, &key);
-        if (!fwd) return record_verdict(ctx, VERDICT_ABORT);
+        if (!fwd)
+        {
+            printf("      ERROR: Egress interface not found\n");
+            return record_verdict(ctx, VERDICT_DROP);
+        }
+        printf("      fwd_external = %d\n", fwd->fwd_external);
 
         // Forwarding
+        printf("    ## FIB lookup ##\n");
         if (fwd->fwd_external)
         {
             // Forward to next AS on path
+            printf("      Forward to next AS on path\n");
             switch (this->path_type)
             {
 #ifdef ENABLE_SCION_PATH
@@ -229,6 +303,7 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
             if (as_ing_ifid != INTERNAL_IFACE)
             {
                 // Forward packet from another AS to another border router in our AS
+                printf("      Forward to sibling\n");
                 if (fwd->sibling.ip_family != this->ip.family)
                     return record_verdict(ctx, VERDICT_UNDERLAY_MISMATCH);
                 lkup_res = forward_internal(this, ctx, &fwd->sibling);
@@ -236,11 +311,13 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
             else
             {
                 // Forward a SCION packet between other (border) routers in our AS
+                printf("      Forward between siblings\n");
                 lkup_res = forward_outer_ip(this, ctx);
             }
         }
     }
 
+    printf("    egress interface = %d\n", lkup_res);
     if (lkup_res == LKUP_RES_RETURN)
         return record_verdict(ctx, this->verdict);
 
@@ -248,6 +325,7 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
     // Packet Rewriting //
     //////////////////////
 
+    printf("  === Rewrite ===\n");
     rewrite(this, &hdr, data_end);
     this->egress_ifindex = lkup_res;
     return -1;
@@ -257,6 +335,7 @@ int process_packet(struct xdp_md* ctx, struct scratchpad *this)
 SEC("xdp")
 int border_router(struct xdp_md* ctx)
 {
+    printf("=== Packet ingress at port %d ===\n", ctx->ingress_ifindex);
     u32 key = 0;
     struct scratchpad *this = bpf_map_lookup_elem(&scratchpad_map, &key);
     if (!this) return XDP_ABORTED;
@@ -269,13 +348,17 @@ int border_router(struct xdp_md* ctx)
     // MAC Verification //
     //////////////////////
 
+    printf("  === MAC Verification ===\n");
+
     if (this->verify_mac_mask & 0x01)
     {
+        printf("    Verify first HF\n");
         if(!verify_hop_field(&this->macinput[0], this->mac[0]))
             return record_verdict(ctx, VERDICT_INVALID_HF);
     }
     if (this->verify_mac_mask & 0x02)
     {
+        printf("    Verify second HF\n");
         if(!verify_hop_field(&this->macinput[1], this->mac[1]))
             return record_verdict(ctx, VERDICT_INVALID_HF);
     }
@@ -285,8 +368,11 @@ int border_router(struct xdp_md* ctx)
     // Output //
     ////////////
 
+    printf("Redirect to port %d\n", this->egress_ifindex);
     verdict = XDP_ABORTED;
     if (bpf_redirect_map(&tx_port_map, this->egress_ifindex, XDP_ABORTED) == XDP_REDIRECT)
         verdict = VERDICT_SCION_FORWARD;
+    else
+        printf("ERROR: Egress port not found\n");
     return record_verdict(ctx, verdict);
 }

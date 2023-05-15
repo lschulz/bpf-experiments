@@ -25,6 +25,7 @@
 #include "constants.h"
 #include "headers.h"
 #include "maps.h"
+#include "debug.h"
 
 #include "bpf/types.h"
 #include "bpf/builtins.h"
@@ -100,6 +101,7 @@ inline int forward_internal(
 
     // FIB lookup
     int res = bpf_fib_lookup(ctx, &this->fib_lookup, sizeof(struct bpf_fib_lookup), 0);
+    printf("      bpf_fib_lookup result = %d\n", res);
     if (res != BPF_FIB_LKUP_RET_SUCCESS)
     {
         switch (res)
@@ -129,11 +131,13 @@ inline int forward_internal(
     src_iface = bpf_map_lookup_elem(&int_iface_map, &key);
     if (!src_iface)
     {
+        printf("      ERROR: Source interface for forwarding not found\n");
         this->verdict = VERDICT_ABORT;
         return LKUP_RES_RETURN;
     }
     if (src_iface->ip_family != this->ip.family)
     {
+        printf("      WARNING: Cannot change underlay protocol\n");
         this->verdict = VERDICT_UNDERLAY_MISMATCH;
         return LKUP_RES_RETURN;
     }
@@ -227,6 +231,7 @@ inline int forward_outer_ip(
 
     // FIB lookup
     int res = bpf_fib_lookup(ctx, &this->fib_lookup, sizeof(struct bpf_fib_lookup), 0);
+    printf("      bpf_fib_lookup result = %d\n", res);
     if (res != BPF_FIB_LKUP_RET_SUCCESS)
     {
         switch (res)
@@ -287,6 +292,7 @@ inline int forward_scion_link(
 
     // FIB lookup
     int res = bpf_fib_lookup(ctx, &this->fib_lookup, sizeof(struct bpf_fib_lookup), 0);
+    printf("      bpf_fib_lookup result = %d\n", res);
     if (res != BPF_FIB_LKUP_RET_SUCCESS)
     {
         switch (res)

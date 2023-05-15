@@ -53,6 +53,9 @@ static void printUsage()
         "Usage: br-loader attach <xdp object> <config> [iface...]\n"
         "                 detach [iface...]\n"
         "                 watch <br> <iface>\n"
+    #ifdef XDP_DEBUG_PRINT
+        "                 logs <br>\n"
+    #endif
     #ifdef ENABLE_HF_CHECK
         "       br-loader key add <br> <index> <key>\n"
         "                 key remove <br> <index>\n"
@@ -105,6 +108,9 @@ int attachBr(int argc, char* argv[])
     auto macKeyMapPath = pinDir / "mac_key_map";
 #endif
     auto portStatsMapPath = pinDir / "port_stats_map";
+#ifdef XDP_DEBUG_PRINT
+    auto ringbufMapPath = pinDir / "ringbuf";
+#endif
 
     // Load XDP program
     auto bpf = Bpf::Object::FromFile(argv[0]);
@@ -126,6 +132,11 @@ int attachBr(int argc, char* argv[])
     bool reuseStatsMap = bpf.reusePinnedMap("port_stats_map", portStatsMapPath.c_str());
     if (reuseStatsMap)
         std::cout << "Reusing pinned map: " << portStatsMapPath << "\n";
+#ifdef XDP_DEBUG_PRINT
+    bool reuseRingbuf = bpf.reusePinnedMap("debug_ringbuf", ringbufMapPath.c_str());
+    if (reuseRingbuf)
+        std::cout << "Reusing pinned map: " << ringbufMapPath << "\n";
+#endif
 
     bpf.load();
     initializeMaps(bpf, *config, interfaces);
@@ -149,6 +160,13 @@ int attachBr(int argc, char* argv[])
         auto map = bpf.findMapByName("port_stats_map", BPF_MAP_TYPE_PERCPU_HASH);
         if (map) map->pin(portStatsMapPath.c_str());
     }
+#ifdef XDP_DEBUG_PRINT
+    if (!reuseRingbuf)
+    {
+        auto ringbuf = bpf.findMapByName("debug_ringbuf", BPF_MAP_TYPE_RINGBUF);
+        if (ringbuf) ringbuf->pin(ringbufMapPath.c_str());
+    }
+#endif
 
     // Attach BR to CPU redirection map
     for (uint32_t cpu : config->cpus)
@@ -195,6 +213,29 @@ int watchBr(int argc, char* argv[])
 
     return EXIT_SUCCESS;
 }
+
+#ifdef XDP_DEBUG_PRINT
+int readLog(int argc, char* argv[])
+{
+    if (argc < 1)
+    {
+        printUsage();
+        return EXIT_FAILURE;
+    }
+
+    auto pinPath = std::filesystem::path(PIN_BASE_DIR) / argv[0] / "ringbuf";
+
+    auto ringbuf = Bpf::PinnedMap::Open(pinPath.c_str(), BPF_MAP_TYPE_RINGBUF);
+    Bpf::Ringbuf rb(ringbuf.getFd(), [](void *data, size_t len) {
+        std::cout << reinterpret_cast<char*>(data);
+        return 0;
+    });
+
+    rb.pollLoop();
+
+    return EXIT_SUCCESS;
+}
+#endif
 
 #ifdef ENABLE_HF_CHECK
 int addHopKey(int argc, char* argv[])
@@ -290,6 +331,10 @@ int main(int argc, char* argv[])
                 return detachBr(argc - 2, argv + 2);
             else if (std::strcmp(argv[1], "watch") == 0)
                 return watchBr(argc - 2, argv + 2);
+        #ifdef XDP_DEBUG_PRINT
+            else if (std::strcmp(argv[1], "logs") == 0)
+                return readLog(argc - 2, argv + 2);
+        #endif
         #ifdef ENABLE_HF_CHECK
             else if (std::strcmp(argv[1], "key") == 0)
             {

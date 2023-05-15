@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 project(xdp-br)
 
+set(ENABLE_DEBUG_PRINT ON CACHE BOOL "Enable debug messages from XDP")
 set(ENABLE_IPV4 ON CACHE BOOL "Enable IPv4 support")
 set(ENABLE_IPV6 ON CACHE BOOL "Enable IPv6 support")
 set(ENABLE_SCION_PATH ON CACHE BOOL "Enable support for standard SCION paths")
@@ -47,6 +48,10 @@ add_custom_command(
 )
 
 # Configure optional features
+if(ENABLE_DEBUG_PRINT)
+    target_compile_definitions(br-loader PUBLIC XDP_DEBUG_PRINT)
+    target_compile_definitions(xdp_br_objs PUBLIC XDP_DEBUG_PRINT)
+endif()
 if(ENABLE_IPV4)
     target_compile_definitions(br-loader PUBLIC ENABLE_IPV4)
     target_compile_definitions(xdp_br_objs PUBLIC ENABLE_IPV4)

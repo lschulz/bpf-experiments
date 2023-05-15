@@ -27,6 +27,14 @@
 #include <linux/bpf.h>
 
 
+#ifdef XDP_DEBUG_PRINT
+/// \brief Ring buffer for debug log.
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 64 * 1024);
+} debug_ringbuf SEC(".maps");
+#endif
+
 /// \brief Maps a tuple of device port, IP and UDP port to a SCION AS interface identifier (a small
 /// positive integer).
 struct {

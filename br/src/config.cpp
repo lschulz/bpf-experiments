@@ -145,7 +145,7 @@ void parseTopology(const boost::json::value &topo, const std::string &self, BrIn
 std::vector<uint32_t> parseCpuList(const std::string &str)
 {
     std::vector<uint32_t> cpus;
-    const int maxCpus = std::min((int)sysconf(_SC_NPROCESSORS_ONLN), MAX_CPUS);
+    const uint32_t maxCpus = std::min((uint32_t)sysconf(_SC_NPROCESSORS_ONLN), (uint32_t)MAX_CPUS);
 
     // Parse list to vector, expand ranges
     std::stringstream stream(str);

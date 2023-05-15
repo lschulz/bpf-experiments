@@ -18,6 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+/// \file common.h
+/// \brief Declarations needed in both user and kernel space.
+
 #ifndef COMMON_H_GUARD
 #define COMMON_H_GUARD
 

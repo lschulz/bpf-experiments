@@ -24,6 +24,7 @@
 #include "common.h"
 #include "constants.h"
 #include "headers.h"
+#include "debug.h"
 
 #include "bpf/types.h"
 #include "bpf/builtins.h"
@@ -48,17 +49,24 @@ inline void* parse_underlay(
     this->verdict = VERDICT_NOT_SCION;
 
     // Ethernet
+    printf("    ## Ethernet ##\n");
     hdr->eth = data;
     data += sizeof(*hdr->eth);
     if (data > data_end) return NULL;
     memcpy(this->eth.dst, hdr->eth->h_dest, ETH_ALEN);
     memcpy(this->eth.src, hdr->eth->h_source, ETH_ALEN);
+    printf("      dst = %02x:%02x:%02x:%02x:%02x:%02x\n", this->eth.dst[0], this->eth.dst[1],
+        this->eth.dst[2], this->eth.dst[3], this->eth.dst[4], this->eth.dst[5]);
+    printf("      src = %02x:%02x:%02x:%02x:%02x:%02x\n", this->eth.src[0], this->eth.src[1],
+        this->eth.src[2], this->eth.src[3], this->eth.src[4], this->eth.src[5]);
+    printf("      proto = 0x%04x\n", ntohs(hdr->eth->h_proto));
 
     // IP
     switch (hdr->eth->h_proto)
     {
 #ifdef ENABLE_IPV4
     case htons(ETH_P_IP):
+        printf("    ## IPv4 ##\n");
         hdr->ip.v4 = data;
         data += sizeof(*hdr->ip.v4);
         if (data > data_end) return NULL;
@@ -68,6 +76,9 @@ inline void* parse_underlay(
         this->udp_residual = this->ip_residual;
         // TTL is not part of UDP checksum
         this->ip_residual -= (this->ip.v4.ttl = hdr->ip.v4->ttl);
+        printf("      dst = 0x%08x\n", ntohl(this->ip.v4.dst));
+        printf("      src = 0x%08x\n", ntohl(this->ip.v4.src));
+        printf("      ttl = %d\n", this->ip.v4.ttl);
         // Skip options
         size_t skip = 4 * (size_t)hdr->ip.v4->ihl - sizeof(*hdr->ip.v4);
         if (skip > 40) return NULL;
@@ -80,6 +91,7 @@ inline void* parse_underlay(
 #endif
 #ifdef ENABLE_IPV6
     case htons(ETH_P_IPV6):
+        printf("    ## IPv6 ##\n");
         hdr->ip.v6 = data;
         data += sizeof(*hdr->ip.v6);
         if (data > data_end) return NULL;
@@ -93,6 +105,11 @@ inline void* parse_underlay(
             this->udp_residual -= this->ip.v6.src[i];
         }
         this->ip.v6.hop_limit = hdr->ip.v6->hop_limit;
+        printf("      dst = %08x:%08x:%08x:%08x\n", ntohl(this->ip.v6.dst[0]),
+            ntohl(this->ip.v6.dst[1]), ntohl(this->ip.v6.dst[2]), ntohl(this->ip.v6.dst[3]));
+        printf("      src = %08x:%08x:%08x:%08x\n", ntohl(this->ip.v6.src[0]),
+            ntohl(this->ip.v6.src[1]), ntohl(this->ip.v6.src[2]), ntohl(this->ip.v6.src[3]));
+        printf("      hop limit = %d\n", this->ip.v6.hop_limit);
     #ifdef ENABLE_IPV4
         memset(&this->ip.v4, 0, sizeof(this->ip.v4));
     #endif
@@ -104,11 +121,14 @@ inline void* parse_underlay(
     }
 
     // UDP
+    printf("    ## UDP ##\n");
     hdr->udp = data;
     data += sizeof(*hdr->udp);
     if (data > data_end) return NULL;
     this->udp_residual -= (this->udp.dst = hdr->udp->dest);
     this->udp_residual -= (this->udp.src = hdr->udp->source);
+    printf("      dst port = %d\n", ntohs(this->udp.dst));
+    printf("      src port = %d\n", ntohs(this->udp.src));
 
     return data;
 };
@@ -117,6 +137,7 @@ inline void* parse_underlay(
 __attribute__((__always_inline__))
 inline void* parse_scion(struct scratchpad *this, struct headers *hdr, void *data, void *data_end)
 {
+    printf("    ## SCION ##\n");
     this->verdict = VERDICT_PARSE_ERROR;
 
     // SCION common and address header
@@ -135,6 +156,7 @@ inline void* parse_scion(struct scratchpad *this, struct headers *hdr, void *dat
 
     // Path
     this->path_type = hdr->scion->type;
+    printf("      path type = %d\n", this->path_type);
     switch (hdr->scion->type)
     {
 #ifdef ENABLE_SCION_PATH
@@ -153,6 +175,7 @@ __attribute__((__always_inline__))
 inline void* parse_scion_path(
     struct scratchpad *this, struct headers *hdr, void *data, void *data_end)
 {
+    printf("      ## SCION Path ##\n");
     this->verdict = VERDICT_PARSE_ERROR;
 
     // Meta header
@@ -162,9 +185,12 @@ inline void* parse_scion_path(
     this->udp_residual -= *hdr->scion_path.meta;
 
     this->path.scion.h_meta = ntohl(*hdr->scion_path.meta);
+    printf("        meta hdr = 0x%08x\n", this->path.scion.h_meta);
     this->path.scion.seg0 = PATH_GET_SEG0_HOST(this->path.scion.h_meta);
     this->path.scion.seg1 = PATH_GET_SEG1_HOST(this->path.scion.h_meta);
     this->path.scion.seg2 = PATH_GET_SEG2_HOST(this->path.scion.h_meta);
+    printf("        segment lengths = %d, %d, %d\n",
+        this->path.scion.seg0, this->path.scion.seg1, this->path.scion.seg2);
 
     // Calculate number of info and hop fields
     u32 num_inf = (this->path.scion.seg0 > 0) + (this->path.scion.seg1 > 0)
@@ -172,6 +198,7 @@ inline void* parse_scion_path(
     u32 num_hf = this->path.scion.seg0 + this->path.scion.seg1 + this->path.scion.seg2;
     this->path.scion.num_inf = num_inf;
     this->path.scion.num_hf = num_hf;
+    printf("        info fields = %d, hop fields = %d\n", num_inf, num_hf);
 
     // Find current info and hop field
     // A second info field is needed if the path changes over from one segment to the next and
@@ -179,6 +206,8 @@ inline void* parse_scion_path(
     u32 curr_inf = this->path.scion.curr_inf = PATH_GET_CURR_INF_HOST(this->path.scion.h_meta);
     u32 curr_hf = this->path.scion.curr_hf = PATH_GET_CURR_HF_HOST(this->path.scion.h_meta);
     this->path.scion.segment_switch = 0;
+    printf("        current info field = %d\n", curr_inf);
+    printf("        current hop  field = %d\n", curr_hf);
 
     // Current info field
     struct infofield *inf = data + curr_inf * sizeof(struct infofield);
@@ -186,6 +215,7 @@ inline void* parse_scion_path(
     if (((void*)inf + sizeof(struct infofield)) > data_end) return NULL;
     this->path.scion.seg_id[0] = inf->seg_id;
     this->udp_residual -= inf->seg_id;
+    printf("        seg id = 0x%04x\n", this->path.scion.seg_id[0]);
 
     // Next info field
     if (curr_inf + 1 < num_inf)
@@ -193,6 +223,7 @@ inline void* parse_scion_path(
         ++inf;
         if (((void*)inf + sizeof(struct infofield)) > data_end) return NULL;
         this->path.scion.seg_id[1] = inf->seg_id;
+        printf("        next seg id = 0x%04d\n", this->path.scion.seg_id[1]);
     }
 
     // Current hop field

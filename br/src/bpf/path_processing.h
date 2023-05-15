@@ -24,6 +24,7 @@
 #include "common.h"
 #include "constants.h"
 #include "headers.h"
+#include "debug.h"
 
 #include "bpf/types.h"
 #include "bpf/builtins.h"
@@ -62,9 +63,12 @@ inline void defer_verify_hop_field(
 __attribute__((__always_inline__))
 inline bool scion_as_ingress(struct scratchpad *this, struct headers *hdr, void *data_end)
 {
+    printf("    ## AS Ingress Processing ##\n");
+
     // Full router must handle the packet if router alert flags are set
     if (hdr->scion_path.hf->flags & 0x03)
     {
+        printf("    Ingress router alert\n");
         this->verdict = VERDICT_ROUTER_ALERT;
         return false;
     }
@@ -87,8 +91,10 @@ inline bool scion_as_ingress(struct scratchpad *this, struct headers *hdr, void 
     u32 next_hf = this->path.scion.curr_hf + 1;
     if (next_hf >= this->path.scion.num_hf)
     {
+        printf("      Last hop reached\n");
         if (hdr->scion->dst != this->local_as)
         {
+            printf("      ERROR: Destination address does not match local AS\n");
             this->verdict = VERDICT_DROP;
             return false;
         }
@@ -101,12 +107,14 @@ inline bool scion_as_ingress(struct scratchpad *this, struct headers *hdr, void 
     else if (next_hf < this->path.scion.num_hf && next_hf == seg_end)
     {
         // Advance to next path segment
+        printf("      Advance to next path segment\n");
         this->path.scion.segment_switch = 1;
         ++this->path.scion.curr_inf;
         ++this->path.scion.curr_hf;
         ++hdr->scion_path.hf;
         if (((void*)hdr->scion_path.hf + sizeof(struct hopfield)) > data_end)
         {
+            printf("      ERROR: Packet too short\n");
             this->verdict = VERDICT_PARSE_ERROR;
             return false;
         }
@@ -119,17 +127,20 @@ inline bool scion_as_ingress(struct scratchpad *this, struct headers *hdr, void 
 __attribute__((__always_inline__))
 inline bool scion_as_egress(struct scratchpad *this, struct headers *hdr, u32 as_ing_ifid, void *data_end)
 {
+    printf("    ## AS Egress Processing ##\n");
     this->verdict = XDP_ABORTED;
 
     // Full router must handle the packet if router alert flags are set
     if (hdr->scion_path.hf->flags & 0x03)
     {
+        printf("      Egress router alert\n");
         this->verdict = VERDICT_ROUTER_ALERT;
         return false;
     }
 
     // If segment_switch is one, we need to work with the second segment identifier.
     u32 seg_switch = this->path.scion.segment_switch;
+    printf("      segment switch = %d\n", seg_switch);
 
     // If we have switched from one segment to another at the end of ingress processing,
     // we must use and update the new current hop field during egress processing.

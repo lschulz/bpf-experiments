@@ -44,7 +44,7 @@ IA IA::from_string(std::string &raw)
 
     // Parse ASN
     ASN asn = 0;
-    for (int i = 2; i < size; ++i)
+    for (std::size_t i = 2; i < size; ++i)
     {
         conv.clear();
         std::uint32_t group = 0;
