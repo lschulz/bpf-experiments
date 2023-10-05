@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -114,7 +114,7 @@ TEST_CASE("128-bit AES single block")
         }}}
     };
 
-    SUBCASE("aes_cypher")
+    SUBCASE("aes_encrypt")
     {
         for (size_t i = 0; i < AES_TEST_VECTORS; ++i)
         {
@@ -122,7 +122,7 @@ TEST_CASE("128-bit AES single block")
             aes_key_expansion(&key[i], &keySchedule);
 
             struct aes_block output = {};
-            aes_cypher(&input[i], &keySchedule, &output);
+            aes_encrypt(&input[i], &keySchedule, &output);
 
             CAPTURE(i);
             for (size_t j = 0; j < 4*AES_BLOCK_SIZE; ++j)
@@ -132,7 +132,25 @@ TEST_CASE("128-bit AES single block")
             }
         }
     }
-    SUBCASE("aes_cypher_unaligned128")
+    SUBCASE("aes_encrypt_tbox")
+    {
+        for (size_t i = 0; i < AES_TEST_VECTORS; ++i)
+        {
+            struct aes_key_schedule keySchedule = {};
+            aes_key_expansion(&key[i], &keySchedule);
+
+            struct aes_block output = {};
+            aes_encrypt_tbox(&input[i], &keySchedule, &output);
+
+            CAPTURE(i);
+            for (size_t j = 0; j < 4*AES_BLOCK_SIZE; ++j)
+            {
+                CAPTURE(j);
+                CHECK(output.b[j] == expected[i].b[j]);
+            }
+        }
+    }
+    SUBCASE("aes_encrypt_unaligned128")
     {
         for (size_t i = 0; i < AES_TEST_VECTORS; ++i)
         {
@@ -141,7 +159,7 @@ TEST_CASE("128-bit AES single block")
             aes_key_expansion_128(keyReg, keySchedule);
 
             struct aes_block output = {};
-            aes_cypher_unaligned128(&input[i], keySchedule, &output);
+            aes_encrypt_unaligned128(&input[i], keySchedule, &output);
 
             CAPTURE(i);
             for (size_t j = 0; j < 4*AES_BLOCK_SIZE; ++j)
@@ -192,6 +210,21 @@ TEST_CASE("AES-CMAC")
             {
                 struct aes_cmac mac = {};
                 aes_cmac(message, msgLength[i], &keySchedule, subkeys, &mac);
+
+                INFO("length = ", msgLength[i]);
+                for (size_t j = 0; j < AES_KEY_LENGTH; ++j)
+                {
+                    CAPTURE(j);
+                    CHECK(mac.w[j] == expected[i].w[j]);
+                }
+            }
+        }
+        SUBCASE("aes_cmac_tbox")
+        {
+            for (size_t i = 0; i < CMAC_TEST_VECTORS; ++i)
+            {
+                struct aes_cmac mac = {};
+                aes_cmac_tbox(message, msgLength[i], &keySchedule, subkeys, &mac);
 
                 INFO("length = ", msgLength[i]);
                 for (size_t j = 0; j < AES_KEY_LENGTH; ++j)

@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -47,7 +47,6 @@ struct {
     __uint(value_size, sizeof(struct key_schedule));
     __uint(max_entries, 8);
 } aes_key_map SEC(".maps");
-
 
 struct testhdr
 {

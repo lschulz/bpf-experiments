@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -42,6 +42,11 @@ static const auto STATIC_AES_KEY = aes_key {{ .w = {
     0x16157e2b, 0xa6d2ae28, 0x8815f7ab, 0x3c4fcf09
 }}};
 
+extern const uint32_t AES_T0[256];
+extern const uint32_t AES_T1[256];
+extern const uint32_t AES_T2[256];
+extern const uint32_t AES_T3[256];
+
 Bpf::Util::InterruptSignalHandler signalHandler;
 
 
@@ -76,6 +81,26 @@ bool populateMaps(Bpf::Object &bpf)
     else
     {
         std::cerr << "SBox map not found\n";
+        return false;
+    }
+
+    // Update TBox
+    auto tboxMap = bpf.findMapByName("AES_TBox", BPF_MAP_TYPE_ARRAY);
+    if (tboxMap)
+    {
+        const uint32_t *t[] = {AES_T0, AES_T1, AES_T2, AES_T3};
+        for (uint32_t key = 0; key < 4; ++key)
+        {
+            if (!tboxMap->update(&key, sizeof(key), t[key], 1024, BPF_ANY))
+            {
+                std::cerr << "TBox update failed\n";
+                return false;
+            }
+        }
+    }
+    else
+    {
+        std::cerr << "TBox map not found\n";
         return false;
     }
 

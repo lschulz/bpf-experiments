@@ -5,6 +5,7 @@ project(aes)
 # AES library (native)
 add_library(aes STATIC
     src/aes.c
+    src/t_tables/t_tables.c
     src/aes_hw_accel.c
 )
 target_include_directories(aes PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

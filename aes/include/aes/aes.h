@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 /// \brief AES key expansion, encryption, and MAC computation.
 ///
 /// This file can be included both in control plane programs and in data plane BPF programs.
-/// For data plane applications, only the core AES cypher and certain MAC-sizes are implemented.
+/// For data plane applications, only the core AES cipher and certain MAC-sizes are implemented.
 /// The key expansion and subkey derivation needed to use these functions must be performed in the
 /// control plane.
 /// Since global BPF functions (which are verified independently from one another and can be called
@@ -94,7 +94,12 @@ void aes_key_expansion(
 #endif
 
 
-int aes_cypher(
+int aes_encrypt(
+    const struct aes_block *input,
+    const struct aes_key_schedule *key_schedule,
+    struct aes_block *output);
+
+int aes_encrypt_tbox(
     const struct aes_block *input,
     const struct aes_key_schedule *key_schedule,
     struct aes_block *output);
@@ -107,6 +112,12 @@ void aes_cmac_subkeys(
     struct aes_block subkeys[2]);
 
 void aes_cmac(
+    const uint8_t *data, size_t len,
+    const struct aes_key_schedule *key_schedule,
+    const struct aes_block subkeys[2],
+    struct aes_cmac *mac);
+
+void aes_cmac_tbox(
     const uint8_t *data, size_t len,
     const struct aes_key_schedule *key_schedule,
     const struct aes_block subkeys[2],
@@ -136,8 +147,8 @@ inline void aes_cmac_16bytes(
     for (size_t i = 0; i < 4*AES_BLOCK_SIZE; ++i)
         mac->b[i] = data->b[i] ^ subkey->b[i];
 
-    // Invoke block cypher
-    aes_cypher((struct aes_block*)mac, key_schedule, (struct aes_block*)mac);
+    // Invoke block cipher
+    aes_encrypt_tbox((struct aes_block*)mac, key_schedule, (struct aes_block*)mac);
 }
 
 #endif // !defined __bpf__

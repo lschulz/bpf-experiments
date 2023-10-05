@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -38,7 +38,8 @@ std::random_device rng;
 std::uniform_int_distribution<uint64_t> dist;
 
 
-void benchmarkSoft(unsigned int n)
+template<typename Func>
+void benchmarkSoft(unsigned int n, Func &aes_cmac)
 {
     struct aes_key_schedule keySchedule = {};
     aes_key_expansion(&key, &keySchedule);
@@ -94,7 +95,10 @@ int main(int argc, char* argv[])
     std::cout << "AES CPU Benchmark\n";
 
     std::cout << "Software\n";
-    benchmarkSoft(100000);
+    benchmarkSoft(100000, aes_cmac);
+
+    std::cout << "Software (T-Box)\n";
+    benchmarkSoft(100000, aes_cmac_tbox);
 
     std::cout << "With Hardware Support\n";
     benchmarkHard(100000);

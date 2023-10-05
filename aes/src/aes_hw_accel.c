@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -93,7 +93,7 @@ void aes_key_expansion_128(__m128i key, __m128i key_schedule[AES_SCHED_SIZE / 4]
 /// \param[in] input Input block
 /// \param[in] key_schedule AES round keys
 /// \return Encrypted output block
-__m128i aes_cypher_128(const __m128i input, const __m128i key_schedule[AES_SCHED_SIZE / 4])
+__m128i aes_encrypt_128(const __m128i input, const __m128i key_schedule[AES_SCHED_SIZE / 4])
 {
     // Initialization (round 0)
     __m128i state = input;
@@ -113,13 +113,13 @@ __m128i aes_cypher_128(const __m128i input, const __m128i key_schedule[AES_SCHED
 /// \param[in] input Input block
 /// \param[in] key_schedule AES round keys
 /// \param[out] ouput Encrypted output block
-void aes_cypher_unaligned128(
+void aes_encrypt_unaligned128(
     const struct aes_block *input,
     const __m128i key_schedule[AES_SCHED_SIZE / 4],
     struct aes_block *output)
 {
     __m128i block = _mm_loadu_si128((const __m128i_u*)input);
-    block = aes_cypher_128(block, key_schedule);
+    block = aes_encrypt_128(block, key_schedule);
     _mm_storeu_si128((__m128i_u*)output, block);
 }
 
@@ -166,7 +166,7 @@ void aes_cmac_subkeys_128(const __m128i key_schedule[AES_SCHED_SIZE / 4], __m128
 {
     // First subkey
     __m128i subkey = _mm_setzero_si128();
-    subkey = aes_cypher_128(subkey, key_schedule);
+    subkey = aes_encrypt_128(subkey, key_schedule);
     subkey = generate_subkey_helper(subkey);
     _mm_store_si128(subkeys, subkey);
 
@@ -214,7 +214,7 @@ void aes_cmac_unaligned128(
         }
 
         state = _mm_xor_si128(state, _mm_load_si128((__m128i*)staging));
-        state = aes_cypher_128(state, key_schedule);
+        state = aes_encrypt_128(state, key_schedule);
         offset += 4*AES_BLOCK_SIZE;
     }
     while (offset < len);

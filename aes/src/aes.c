@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -63,6 +63,13 @@ struct {
     __uint(max_entries, 1);
 } AES_SBox SEC(".maps");
 
+struct {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, 256 * sizeof(u32));
+    __uint(max_entries, 4);
+} AES_TBox SEC(".maps");
+
 #define UNROLL_LOOP _Pragma("unroll")
 
 #else // defined __bpf__
@@ -88,6 +95,11 @@ const uint8_t AES_SBox[256] = {
 static const uint8_t AES_Rcon[11] = {
     0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36
 };
+
+extern const uint32_t AES_T0[256];
+extern const uint32_t AES_T1[256];
+extern const uint32_t AES_T2[256];
+extern const uint32_t AES_T3[256];
 
 #define UNROLL_LOOP
 
@@ -246,7 +258,7 @@ BPF_VOID mix_columns(struct aes_block *state)
 /// \param[out] ouput Encrypted output block
 /// \return Unused, always returns 0. Returning a value is necessary to match the expected signature
 ///         of BPF "global functions".
-int aes_cypher(
+int aes_encrypt(
     const struct aes_block *input,
     const struct aes_key_schedule *key_schedule,
     struct aes_block *output)
@@ -292,6 +304,68 @@ int aes_cypher(
     return 0;
 }
 
+/// \brief Encrypt a block with the given key schedule.
+/// Should be faster than aes_encrypt as it uses the "T-Box" optimization.
+/// \param[in] input Input block
+/// \param[in] key_schedule AES round keys
+/// \param[out] ouput Encrypted output block
+/// \return Unused, always returns 0. Returning a value is necessary to match the expected signature
+///         of BPF "global functions".
+int aes_encrypt_tbox(
+    const struct aes_block *input,
+    const struct aes_key_schedule *key_schedule,
+    struct aes_block *output)
+{
+    const uint8_t *sbox;
+    const uint32_t *t[4];
+#ifdef __bpf__
+    if (!input || !key_schedule || !output) return 0;
+
+    u32 key = 0;
+    sbox = bpf_map_lookup_elem(&AES_SBox, &key);
+    if (!sbox) return 0;
+    UNROLL_LOOP
+    for (u32 i = 0; i < 4; ++i)
+    {
+        key = i;
+        t[i] = bpf_map_lookup_elem(&AES_TBox, &key);
+        if (!t[i]) return 0;
+    }
+#else
+    sbox = AES_SBox;
+    t[0] = AES_T0;
+    t[1] = AES_T1;
+    t[2] = AES_T2;
+    t[3] = AES_T3;
+#endif
+
+    // The state matrix is stored in column-major order
+    struct aes_block state;
+    for (unsigned int i = 0; i < 4; ++i) state.w[i] = input->w[i] ^ key_schedule->k[0].w[i];
+
+    // First 9 rounds
+    for (unsigned int round = 1; round < AES_ROUNDS; ++round)
+    {
+        uint32_t c[4];
+        c[0] = t[0][state.w[0]&0xff] ^ t[1][state.w[1]>>8&0xff] ^ t[2][state.w[2]>>16&0xff] ^ t[3][state.w[3]>>24&0xff];
+        c[1] = t[0][state.w[1]&0xff] ^ t[1][state.w[2]>>8&0xff] ^ t[2][state.w[3]>>16&0xff] ^ t[3][state.w[0]>>24&0xff];
+        c[2] = t[0][state.w[2]&0xff] ^ t[1][state.w[3]>>8&0xff] ^ t[2][state.w[0]>>16&0xff] ^ t[3][state.w[1]>>24&0xff];
+        c[3] = t[0][state.w[3]&0xff] ^ t[1][state.w[0]>>8&0xff] ^ t[2][state.w[1]>>16&0xff] ^ t[3][state.w[2]>>24&0xff];
+        for (unsigned int i = 0; i < 4; ++i) state.w[i] = c[i] ^ key_schedule->k[round].w[i];
+    }
+
+    // Last round
+    uint32_t c[4];
+    c[0] = (uint32_t)sbox[state.w[0]&0xff] ^ (uint32_t)sbox[state.w[1]>>8&0xff]<<8 ^ (uint32_t)sbox[state.w[2]>>16&0xff]<<16 ^ (uint32_t)sbox[state.w[3]>>24&0xff]<<24;
+    c[1] = (uint32_t)sbox[state.w[1]&0xff] ^ (uint32_t)sbox[state.w[2]>>8&0xff]<<8 ^ (uint32_t)sbox[state.w[3]>>16&0xff]<<16 ^ (uint32_t)sbox[state.w[0]>>24&0xff]<<24;
+    c[2] = (uint32_t)sbox[state.w[2]&0xff] ^ (uint32_t)sbox[state.w[3]>>8&0xff]<<8 ^ (uint32_t)sbox[state.w[0]>>16&0xff]<<16 ^ (uint32_t)sbox[state.w[1]>>24&0xff]<<24;
+    c[3] = (uint32_t)sbox[state.w[3]&0xff] ^ (uint32_t)sbox[state.w[0]>>8&0xff]<<8 ^ (uint32_t)sbox[state.w[1]>>16&0xff]<<16 ^ (uint32_t)sbox[state.w[2]>>24&0xff]<<24;
+    for (unsigned int i = 0; i < 4; ++i) state.w[i] = c[i] ^ key_schedule->k[AES_ROUNDS].w[i];
+
+    *output = state;
+    return 0;
+}
+
 #ifndef __bpf__
 /// \brief Performs part of the subkey derivation procedure.
 /// \param[inout] subkey
@@ -316,7 +390,7 @@ void aes_cmac_subkeys(
 {
     // First subkey
     memset(subkeys, 0, 4*AES_KEY_LENGTH);
-    aes_cypher(&subkeys[0], key_schedule, &subkeys[0]);
+    aes_encrypt(&subkeys[0], key_schedule, &subkeys[0]);
     generate_subkey_helper(&subkeys[0]);
 
     // Second subkey
@@ -359,7 +433,50 @@ void aes_cmac(
                 state.b[j] ^= subkey[j];
         }
 
-        aes_cypher(&state, key_schedule, &state);
+        aes_encrypt(&state, key_schedule, &state);
+        offset += 4*AES_BLOCK_SIZE;
+    }
+    while (offset < len);
+
+    memcpy(mac, &state, 4*AES_BLOCK_SIZE);
+}
+
+/// \brief Calculate the AES-CMAC according to RFC4493.
+/// \param[in] data Input data
+/// \param[in] len Size of the input data in bytes
+/// \param[in] key_schedule AES round keys
+/// \param[in] subkeys Subkeys derived from the main key by aes_cmac_subkeys()
+/// \param[out] mac Computed MAC
+void aes_cmac_tbox(
+    const uint8_t *data, size_t len,
+    const struct aes_key_schedule *key_schedule,
+    const struct aes_block subkeys[2],
+    struct aes_cmac *mac)
+{
+    const uint8_t* subkey = subkeys[0].b;
+
+    // Process input block-by-block
+    struct aes_block state = {};
+    size_t offset = 0;
+    do {
+        size_t i = 0;
+        for (; i < 4*AES_BLOCK_SIZE && (offset + i) < len; ++i)
+            state.b[i] ^= data[offset + i];
+
+        // Special treatment of the last block
+        if (offset + 4*AES_BLOCK_SIZE >= len)
+        {
+            if (i < 4*AES_BLOCK_SIZE)
+            {
+                state.b[i] ^= 0x80;    // padding
+                subkey = subkeys[1].b; // use second subkey
+            }
+            // XOR subkey
+            for (size_t j = 0; j < 4*AES_BLOCK_SIZE; ++j)
+                state.b[j] ^= subkey[j];
+        }
+
+        aes_encrypt_tbox(&state, key_schedule, &state);
         offset += 4*AES_BLOCK_SIZE;
     }
     while (offset < len);
@@ -397,19 +514,19 @@ void aes_cmac_no_loops(
     case 4:
         for (size_t i = 0; i < 4*AES_BLOCK_SIZE; ++i)
             state.b[i] ^= data[offset + i];
-        aes_cypher(&state, key_schedule, &state);
+        aes_encrypt(&state, key_schedule, &state);
         offset += 4*AES_BLOCK_SIZE;
         __attribute__((fallthrough));
     case 3:
         for (size_t i = 0; i < 4*AES_BLOCK_SIZE; ++i)
             state.b[i] ^= data[offset + i];
-        aes_cypher(&state, key_schedule, &state);
+        aes_encrypt(&state, key_schedule, &state);
         offset += 4*AES_BLOCK_SIZE;
         __attribute__((fallthrough));
     case 2:
         for (size_t i = 0; i < 4*AES_BLOCK_SIZE; ++i)
             state.b[i] ^= data[offset + i];
-        aes_cypher(&state, key_schedule, &state);
+        aes_encrypt(&state, key_schedule, &state);
         offset += 4*AES_BLOCK_SIZE;
         __attribute__((fallthrough));
     case 1:
@@ -426,7 +543,7 @@ void aes_cmac_no_loops(
         // XOR subkey
         for (size_t j = 0; j < 4*AES_BLOCK_SIZE; ++j)
             state.b[j] ^= subkey[j];
-        aes_cypher(&state, key_schedule, &state);
+        aes_encrypt(&state, key_schedule, &state);
     }
     }
 

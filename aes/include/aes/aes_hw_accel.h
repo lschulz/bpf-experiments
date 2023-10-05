@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,9 +27,9 @@
 
 void aes_key_expansion_128(__m128i key, __m128i key_schedule[AES_SCHED_SIZE / 4]);
 
-__m128i aes_cypher_128(const __m128i input, const __m128i key_schedule[AES_SCHED_SIZE / 4]);
+__m128i aes_encrypt_128(const __m128i input, const __m128i key_schedule[AES_SCHED_SIZE / 4]);
 
-void aes_cypher_unaligned128(
+void aes_encrypt_unaligned128(
     const struct aes_block *input,
     const __m128i key_schedule[AES_SCHED_SIZE / 4],
     struct aes_block *output);

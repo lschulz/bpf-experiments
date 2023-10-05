@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Lars-Christian Schulz
+// Copyright (c) 2022-2023 Lars-Christian Schulz
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -43,6 +43,10 @@ using std::size_t;
 using std::uint8_t;
 using std::uint32_t;
 
+extern const uint32_t AES_T0[256];
+extern const uint32_t AES_T1[256];
+extern const uint32_t AES_T2[256];
+extern const uint32_t AES_T3[256];
 
 ////////////////////////
 // Internal Functions //
@@ -103,6 +107,13 @@ void populateSBox(Bpf::Map &sboxMap)
     uint32_t key = 0;
     const uint8_t *value = AES_SBox;
     sboxMap.update(&key, sizeof(key), value, 256, BPF_ANY);
+}
+
+void populateTBox(Bpf::Map &sboxMap)
+{
+    const uint32_t *t[] = {AES_T0, AES_T1, AES_T2, AES_T3};
+    for (uint32_t key = 0; key < 4; ++key)
+        sboxMap.update(&key, sizeof(key), t[key], 1024, BPF_ANY);
 }
 #endif
 
@@ -279,6 +290,11 @@ void initializeMaps(
     mapName = "AES_SBox";
     map = bpf.findMapByName(mapName, BPF_MAP_TYPE_ARRAY);
     if (map) populateSBox(*map);
+    else printWarning(mapName);
+
+    mapName = "AES_TBox";
+    map = bpf.findMapByName(mapName, BPF_MAP_TYPE_ARRAY);
+    if (map) populateTBox(*map);
     else printWarning(mapName);
 #endif
 
