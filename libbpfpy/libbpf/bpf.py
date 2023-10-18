@@ -26,7 +26,7 @@ from ctypes.util import find_library
 
 _libc = CDLL(find_library("c"))
 _libbpf = CDLL(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../build/libbpf.so.0.8.0")),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "../../build/libbpf.so.1.3.0")),
     use_errno=True
 )
 
